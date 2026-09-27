@@ -17,6 +17,7 @@ import {
   generateDroneChunk,
   generateHazardChunk,
   generateWorldChunk,
+  getDroneExplosions,
   getLaunchVector,
   getWorldCheckpoints,
   getWorldDrones,
@@ -226,6 +227,29 @@ test("side-wall contacts rebound the orb", () => {
   assert.equal(state.orb.lastBounce.normalX, 1);
 });
 
+test("bottom cap rebounds the orb back into the vertical corridor", () => {
+  const state = createGameState();
+  const bottomWall = getWorldSurfaces(state).find(
+    (surface) => surface.type === "bottomWall"
+  );
+
+  assert.ok(bottomWall);
+
+  state.mode = "orb";
+  state.orb.x = 0;
+  state.orb.y = bottomWall.y - GAME_CONFIG.orbRadius - 2;
+  state.orb.vx = 40;
+  state.orb.vy = 360;
+  state.orb.invulnerability = 2;
+
+  stepGame(state, 0.05);
+
+  assert.equal(state.orb.active, true);
+  assert.ok(state.orb.vy < 0);
+  assert.equal(state.orb.lastBounce.surfaceId, "starter-bottom-wall");
+  assert.equal(state.orb.lastBounce.normalY, -1);
+});
+
 test("low-momentum wall bounces settle the orb back to ready", () => {
   const state = createGameState();
 
@@ -242,19 +266,29 @@ test("low-momentum wall bounces settle the orb back to ready", () => {
   assert.equal(state.orb.vy, 0);
 });
 
-test("the course is a vertical corridor with side walls and no floor or ceiling shell", () => {
+test("the course is a vertical corridor with side walls and a closed bottom cap", () => {
   const state = createGameState();
   const surfaces = getWorldSurfaces(state);
+  const bottomWall = surfaces.find((surface) => surface.type === "bottomWall");
 
   assert.ok(surfaces.some((surface) => surface.type === "leftWall"));
   assert.ok(surfaces.some((surface) => surface.type === "rightWall"));
   assert.ok(surfaces.some((surface) => surface.type === "platform"));
+  assert.ok(bottomWall);
+  assert.equal(bottomWall.x, WORLD_CONFIG.corridorLeft);
+  assert.equal(bottomWall.y, WORLD_CONFIG.starterBottomY);
+  assert.equal(
+    bottomWall.width,
+    WORLD_CONFIG.corridorRight - WORLD_CONFIG.corridorLeft
+  );
   assert.equal(surfaces.some((surface) => surface.type === "floor"), false);
   assert.equal(surfaces.some((surface) => surface.type === "ceiling"), false);
   assert.equal(surfaces.some((surface) => surface.type === "obstacle"), false);
 
   for (const surface of surfaces) {
-    assert.ok(["leftWall", "rightWall", "platform"].includes(surface.type));
+    assert.ok(
+      ["leftWall", "rightWall", "bottomWall", "platform"].includes(surface.type)
+    );
     assert.ok(surface.width > 0);
     assert.ok(surface.height > 0);
   }
@@ -530,6 +564,13 @@ test("orb contact destroys a drone without costing a life", () => {
   );
   assert.equal(state.world.destroyedDroneIds.has(drone.id), true);
 
+  const explosions = getDroneExplosions(state);
+  assert.equal(explosions.length, 1);
+  assert.equal(explosions[0].sourceId, drone.id);
+  assert.equal(explosions[0].x, drone.x);
+  assert.equal(explosions[0].y, drone.y);
+  assert.ok(explosions[0].duration > 0);
+
   assert.equal(
     refreshWorldForFocus(
       state,
@@ -541,6 +582,17 @@ test("orb contact destroys a drone without costing a life", () => {
     getWorldDrones(state).some((candidate) => candidate.id === drone.id),
     false
   );
+
+  state.mode = "ready";
+  state.orb.vx = 0;
+  state.orb.vy = 0;
+  state.orb.invulnerability = 10;
+
+  for (let i = 0; i < 20; i += 1) {
+    stepGame(state, 0.05);
+  }
+
+  assert.equal(getDroneExplosions(state).length, 0);
 });
 
 test("procedural hazard difficulty increases as checkpoint chunks advance", () => {
