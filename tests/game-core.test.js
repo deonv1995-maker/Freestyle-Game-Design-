@@ -304,13 +304,16 @@ test("left and right moving platforms are deterministic and move horizontally", 
   assert.ok(moving.every((surface) => surface.motion?.axis === "x"));
 });
 
-test("starter course and generated chunks contain lasers and wall spikes", () => {
-  const generated = generateHazardChunk(2);
-  const types = new Set([...STARTER_HAZARDS, ...generated].map((hazard) => hazard.type));
+test("starter course and generated chunks use lasers without spike hazards", () => {
+  const generated = generateHazardChunk(8);
+  const hazards = [...STARTER_HAZARDS, ...generated];
 
-  assert.equal(types.has("laser"), true);
-  assert.equal(types.has("leftSpikes"), true);
-  assert.equal(types.has("rightSpikes"), true);
+  assert.ok(hazards.length >= 2);
+  assert.ok(hazards.every((hazard) => hazard.type === "laser"));
+  assert.equal(
+    hazards.some((hazard) => /spike/i.test(hazard.type)),
+    false
+  );
 });
 
 test("wall-mounted lasers stay fixed, persist, and cycle their beam on and off", () => {
@@ -326,6 +329,8 @@ test("wall-mounted lasers stay fixed, persist, and cycle their beam on and off",
   assert.equal(HAZARD_CONFIG.laserBaseCycle, 7.2);
   assert.equal(HAZARD_CONFIG.laserMinimumCycle, 3.6);
   assert.equal(HAZARD_CONFIG.laserBeamTravelDuration, 1.8);
+  assert.equal(HAZARD_CONFIG.laserShutdownFlickerDuration, 0.7);
+  assert.equal(HAZARD_CONFIG.laserShutdownFlickerRate, 9);
   assert.equal(laser.laser.cycle, HAZARD_CONFIG.laserBaseCycle);
   assert.equal(laser.motion, undefined);
   assert.ok(["left", "right"].includes(laser.laser.sourceSide));
@@ -451,6 +456,42 @@ test("laser collision follows the visible beam length from either wall", () => {
   );
 });
 
+test("active lasers flicker during the final shutdown warning window", () => {
+  const state = createGameState();
+  state.orb.invulnerability = 10;
+
+  const laser = getWorldHazards(state).find(
+    (hazard) => hazard.id === "starter-laser"
+  );
+
+  laser.laser.phaseTime = 0;
+  const activeDuration = laser.laser.cycle * laser.laser.activeRatio;
+  state.world.clock =
+    activeDuration - HAZARD_CONFIG.laserShutdownFlickerDuration - 0.05;
+
+  stepGame(state, 0.05);
+
+  assert.equal(laser.active, true);
+  assert.equal(laser.laser.shutdownFlicker, true);
+
+  const seenLevels = new Set([laser.laser.flickerLevel]);
+
+  for (let i = 0; i < 12; i += 1) {
+    stepGame(state, 0.025);
+    seenLevels.add(laser.laser.flickerLevel);
+  }
+
+  assert.ok(seenLevels.has(1));
+  assert.ok(seenLevels.has(0.35));
+
+  while (laser.active) {
+    stepGame(state, 0.05);
+  }
+
+  assert.equal(laser.laser.shutdownFlicker, false);
+  assert.equal(laser.laser.beamProgress, 0);
+});
+
 test("all generated lasers span the corridor from persistent wall emitters", () => {
   for (let chunkIndex = 0; chunkIndex < 10; chunkIndex += 1) {
     const lasers = generateHazardChunk(chunkIndex).filter(
@@ -474,32 +515,6 @@ test("all generated lasers span the corridor from persistent wall emitters", () 
       );
     }
   }
-});
-
-test("swept hazard collision detects a wall spike field before tunneling through it", () => {
-  const state = createGameState();
-  const spike = getWorldHazards(state).find(
-    (hazard) => hazard.id === "starter-left-spikes"
-  );
-
-  // The full-width starter laser now overlaps this spike's vertical band.
-  // Disable it here so this regression isolates swept collision with the spike.
-  const laser = getWorldHazards(state).find(
-    (hazard) => hazard.id === "starter-laser"
-  );
-  laser.active = false;
-
-  const hit = findEarliestHazardCollision(
-    state,
-    spike.x + spike.width + 80,
-    spike.y + spike.height * 0.5,
-    spike.x - 80,
-    spike.y + spike.height * 0.5
-  );
-
-  assert.ok(hit);
-  assert.equal(hit.hazard.id, spike.id);
-  assert.equal(hit.cause, "leftSpikes");
 });
 
 test("a lethal hazard removes one life and respawns at the current checkpoint", () => {
@@ -528,7 +543,7 @@ test("using all seven lives automatically restarts the run", () => {
 
   for (let i = 0; i < GAME_CONFIG.startingLives; i += 1) {
     state.orb.invulnerability = 0;
-    assert.equal(loseLife(state, "spikes"), true);
+    assert.equal(loseLife(state, "laser"), true);
   }
 
   assert.equal(state.lives, GAME_CONFIG.startingLives);
@@ -735,7 +750,7 @@ test("world streaming remains bounded far into an upward run", () => {
 
   const activeChunks = WORLD_CONFIG.chunksBehind + WORLD_CONFIG.chunksAhead + 1;
   assert.ok(getWorldSurfaces(state).length <= STARTER_SURFACES.length + activeChunks * 4);
-  assert.ok(getWorldHazards(state).length <= STARTER_HAZARDS.length + activeChunks * 5);
+  assert.ok(getWorldHazards(state).length <= STARTER_HAZARDS.length + activeChunks * 2);
   assert.ok(getWorldDrones(state).length <= 1 + activeChunks * DRONE_CONFIG.maxPerChunk);
   assert.ok(getWorldCheckpoints(state).length <= activeChunks);
 });
@@ -751,6 +766,8 @@ test("configured space-corridor values remain physically valid", () => {
   assert.ok(GAME_CONFIG.touchTimeScale < 1);
   assert.ok(HAZARD_CONFIG.laserMinimumCycle > 0);
   assert.ok(HAZARD_CONFIG.laserBeamTravelDuration > 0);
+  assert.ok(HAZARD_CONFIG.laserShutdownFlickerDuration > 0);
+  assert.ok(HAZARD_CONFIG.laserShutdownFlickerRate > 0);
   assert.ok(
     HAZARD_CONFIG.laserBeamTravelDuration <=
       HAZARD_CONFIG.laserMinimumCycle * HAZARD_CONFIG.laserBaseActiveRatio
