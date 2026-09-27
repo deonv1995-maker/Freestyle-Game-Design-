@@ -206,3 +206,10 @@ Decision: persistent laser emitters keep the same wall-to-wall geometry and on/o
 
 Reason: touching the screen should always create the same planning window, and laser timing should feel deliberate rather than flickery.
 
+## 2026-09-27 — Bottom cap and bounded drone explosions
+
+Decision: the vertical corridor's starting end is physically closed by a `bottomWall` surface spanning the playable corridor width at `starterBottomY`. It uses the same authoritative surface collision collection as the side walls and moving platforms, so downward impacts rebound through the normal collision response. The existing out-of-bounds rule remains only as a safety fallback rather than the visible boundary.
+
+Decision: direct orb contact with a drone still performs the existing gameplay destruction, but the same destruction event now queues a transient explosion record in a dedicated effects collection. Explosion records contain only source position, phase and lifetime data, advance on the authoritative gameplay delta so touch slow motion affects them consistently, and are both duration-pruned and count-capped before rendering.
+
+Reason: the course should read as a deliberately enclosed launch chamber at the bottom, while drone kills need immediate visual confirmation without introducing persistent particle entities, duplicate destruction logic or unbounded mobile runtime state.
