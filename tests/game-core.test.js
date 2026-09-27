@@ -325,6 +325,7 @@ test("wall-mounted lasers stay fixed, persist, and cycle their beam on and off",
 
   assert.equal(HAZARD_CONFIG.laserBaseCycle, 7.2);
   assert.equal(HAZARD_CONFIG.laserMinimumCycle, 3.6);
+  assert.equal(HAZARD_CONFIG.laserBeamTravelDuration, 1.8);
   assert.equal(laser.laser.cycle, HAZARD_CONFIG.laserBaseCycle);
   assert.equal(laser.motion, undefined);
   assert.ok(["left", "right"].includes(laser.laser.sourceSide));
@@ -354,6 +355,100 @@ test("wall-mounted lasers stay fixed, persist, and cycle their beam on and off",
   assert.equal(laser.width, startWidth);
   assert.equal(seenStates.has(true), true);
   assert.equal(seenStates.has(false), true);
+});
+
+test("laser beams extend gradually from the emitter instead of appearing full-width", () => {
+  const state = createGameState();
+  state.orb.invulnerability = 10;
+
+  const laser = getWorldHazards(state).find(
+    (hazard) => hazard.id === "starter-laser"
+  );
+
+  laser.laser.phaseTime = 0;
+  state.world.clock = 0;
+
+  stepGame(state, 0.05);
+
+  assert.equal(laser.active, true);
+  assert.ok(laser.laser.beamProgress > 0);
+  assert.ok(laser.laser.beamProgress < 0.05);
+
+  for (let i = 0; i < 17; i += 1) {
+    stepGame(state, 0.05);
+  }
+
+  assert.ok(Math.abs(laser.laser.beamProgress - 0.5) < 1e-9);
+
+  for (let i = 0; i < 18; i += 1) {
+    stepGame(state, 0.05);
+  }
+
+  assert.equal(laser.laser.beamProgress, 1);
+});
+
+test("laser collision follows the visible beam length from either wall", () => {
+  const state = createGameState();
+  state.orb.invulnerability = 10;
+
+  for (const hazard of getWorldHazards(state)) {
+    hazard.active = false;
+  }
+
+  const laser = getWorldHazards(state).find(
+    (hazard) => hazard.id === "starter-laser"
+  );
+
+  laser.active = true;
+  laser.laser.beamProgress = 0.25;
+
+  const y = laser.y + laser.height * 0.5;
+  const leftQuarterX = laser.x + laser.width * 0.2;
+  const rightQuarterX = laser.x + laser.width * 0.8;
+
+  laser.laser.sourceSide = "left";
+
+  assert.ok(
+    findEarliestHazardCollision(
+      state,
+      leftQuarterX,
+      y,
+      leftQuarterX + 1,
+      y
+    )
+  );
+  assert.equal(
+    findEarliestHazardCollision(
+      state,
+      rightQuarterX,
+      y,
+      rightQuarterX + 1,
+      y
+    ),
+    null
+  );
+
+  laser.laser.sourceSide = "right";
+
+  assert.equal(
+    findEarliestHazardCollision(
+      state,
+      leftQuarterX,
+      y,
+      leftQuarterX + 1,
+      y
+    ),
+    null
+  );
+  assert.ok(
+    findEarliestHazardCollision(
+      state,
+      rightQuarterX,
+      y,
+      rightQuarterX + 1,
+      y
+    )
+  );
 });
 
 test("all generated lasers span the corridor from persistent wall emitters", () => {
@@ -655,6 +750,11 @@ test("configured space-corridor values remain physically valid", () => {
   assert.ok(GAME_CONFIG.touchTimeScale > 0);
   assert.ok(GAME_CONFIG.touchTimeScale < 1);
   assert.ok(HAZARD_CONFIG.laserMinimumCycle > 0);
+  assert.ok(HAZARD_CONFIG.laserBeamTravelDuration > 0);
+  assert.ok(
+    HAZARD_CONFIG.laserBeamTravelDuration <
+      HAZARD_CONFIG.laserMinimumCycle * HAZARD_CONFIG.laserBaseActiveRatio
+  );
   assert.ok(HAZARD_CONFIG.laserMaxActiveRatio < 1);
   assert.ok(WORLD_CONFIG.corridorLeft < WORLD_CONFIG.corridorRight);
   assert.ok(WORLD_CONFIG.chunkHeight > 0);
