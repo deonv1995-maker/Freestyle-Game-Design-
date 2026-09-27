@@ -104,3 +104,12 @@ NPCs alternate between standing and simple ground patrol behavior. Obstacle chec
 The run score stores only the integer number of NPC hit events. Resetting the run resets that counter. No unbounded hit-history collection is kept.
 
 Reason: the world should feel more populated and readable at speed while preserving mobile performance, deterministic procedural generation, one authoritative gameplay simulation, and the existing spear-relay control loop.
+
+
+## 2026-09-27 — Prototype 0.6 auto-relays on world impact and removes defeated NPCs
+
+Decision: a spear collision with solid world geometry now immediately moves the player to the spear's exact impact point. The spear still enters the planted state so the contact remains visible, but the next press no longer performs the relocation when the player is already at that contact; it only begins the next aim gesture.
+
+NPC hits retain a short physical reaction instead of disappearing instantly. A hit NPC is marked defeated immediately, inherits spear momentum, tumbles through the air, enters a brief fallen pose on ground contact, fades, and is then removed from the active NPC collection. Defeated IDs are retained only for the currently streamed definition window and pruned as chunks leave that window, keeping the endless-run state bounded.
+
+Reason: impact should feel immediate and readable while removing an extra relay input after terrain contact, and NPC targets should visibly react to a successful spear hit before leaving the scene without becoming permanent runtime objects.

@@ -1,5 +1,6 @@
 import {
   GAME_CONFIG,
+  NPC_CONFIG,
   beginAim,
   createGameState,
   getAimVector,
@@ -189,7 +190,7 @@ function drawNpcs() {
     const facing = npc.direction < 0 ? -1 : 1;
     const walking = npc.mode === "walking";
     const thrown = npc.mode === "thrown";
-    const recovering = npc.mode === "recovering";
+    const fallen = npc.mode === "fallen";
     const stride = walking
       ? Math.sin(state.animation.clock * (4.2 + npc.speed * 0.035) + npc.x * 0.018)
       : 0;
@@ -204,8 +205,14 @@ function drawNpcs() {
       ctx.translate(0, -24);
       ctx.rotate(npc.rotation);
       ctx.translate(0, 24);
-    } else if (recovering) {
-      ctx.rotate(facing * 0.08);
+    } else if (fallen) {
+      const fade = Math.max(
+        0,
+        Math.min(1, npc.behaviorTimer / NPC_CONFIG.fallenDespawnDelay)
+      );
+      ctx.globalAlpha = fade;
+      ctx.translate(0, -4);
+      ctx.rotate(npc.rotation);
     }
 
     ctx.strokeStyle = npc.hitFlash > 0 ? "#ffd56a" : "#f29b72";
@@ -613,7 +620,7 @@ function updateHud() {
 
   if (state.mode === "stuck") {
     statusNode.textContent =
-      "SPEAR PLANTED · THROW " +
+      "IMPACT RELAY · THROW " +
       state.throwCount +
       " · HITS " +
       state.score.npcHits +
@@ -621,7 +628,7 @@ function updateHud() {
       progressMetres +
       "m";
     hintNode.textContent =
-      "Hold the screen to relay onto this surface, slide to aim, then release.";
+      "You moved to the spear automatically. Hold and slide to aim the next throw.";
     return;
   }
 

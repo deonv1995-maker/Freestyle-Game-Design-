@@ -34,7 +34,7 @@ export const NPC_CONFIG = Object.freeze({
   hitVelocityScale: 0.58,
   hitLift: 170,
   spearCarryThrough: 0.82,
-  recoveryDelay: 0.8
+  fallenDespawnDelay: 0.18
 });
 
 const STARTER_NPCS = Object.freeze([
@@ -196,7 +196,8 @@ export function createGameState() {
       activeStartChunk: null,
       activeEndChunk: null,
       surfaces: [],
-      npcs: []
+      npcs: [],
+      defeatedNpcIds: new Set()
     }
   };
 
@@ -207,14 +208,15 @@ export function createGameState() {
 
 export function beginAim(state, pointerX, pointerY, pointerId = 0) {
   const relayedFromFlight = state.mode === "flying";
-  const teleported = relayedFromFlight || state.mode === "stuck";
+  const spearDistanceFromPlayer = Math.hypot(
+    state.spear.x - state.player.x,
+    state.spear.y - state.player.y
+  );
+  const teleported =
+    relayedFromFlight || (state.mode === "stuck" && spearDistanceFromPlayer > 0.001);
 
   if (teleported) {
-    state.player.x = state.spear.x;
-    state.player.y = state.spear.y;
-    state.teleportPulse = 1;
-    state.world.maxProgressX = Math.max(state.world.maxProgressX, state.player.x);
-    refreshWorldForFocus(state, state.player.x);
+    relocatePlayerToSpear(state);
   }
 
   state.mode = "aiming";
@@ -353,6 +355,9 @@ export function stepGame(state, deltaSeconds) {
         normalY: surfaceHit.normalY
       };
       state.mode = "stuck";
+      relocatePlayerToSpear(state);
+      state.animation.playerAirborne = false;
+      state.animation.airborneAim = false;
     } else {
       state.spear.x = nextX;
       state.spear.y = nextY;
@@ -421,7 +426,11 @@ export function refreshWorldForFocus(state, focusX) {
   state.world.activeStartChunk = startChunk;
   state.world.activeEndChunk = endChunk;
   state.world.surfaces = surfaces;
-  state.world.npcs = reconcileActiveNpcs(state.world.npcs, npcDefinitions);
+  state.world.npcs = reconcileActiveNpcs(
+    state.world.npcs,
+    npcDefinitions,
+    state.world.defeatedNpcIds
+  );
   return true;
 }
 
@@ -545,7 +554,7 @@ export function findEarliestNpcCollision(state, startX, startY, endX, endY) {
   let earliest = null;
 
   for (const npc of state.world.npcs) {
-    if (npc.mode === "thrown") continue;
+    if (npc.mode === "thrown" || npc.mode === "fallen") continue;
 
     const bounds = {
       x: npc.x - NPC_CONFIG.width * 0.5,
@@ -564,9 +573,18 @@ export function findEarliestNpcCollision(state, startX, startY, endX, endY) {
   return earliest;
 }
 
-function reconcileActiveNpcs(existingNpcs, definitions) {
+function reconcileActiveNpcs(existingNpcs, definitions, defeatedNpcIds) {
+  const activeDefinitionIds = new Set(definitions.map((definition) => definition.id));
+  for (const defeatedId of defeatedNpcIds) {
+    if (!activeDefinitionIds.has(defeatedId)) {
+      defeatedNpcIds.delete(defeatedId);
+    }
+  }
+
   const previousById = new Map(existingNpcs.map((npc) => [npc.id, npc]));
-  return definitions.map((definition) => previousById.get(definition.id) || { ...definition });
+  return definitions
+    .filter((definition) => !defeatedNpcIds.has(definition.id))
+    .map((definition) => previousById.get(definition.id) || { ...definition });
 }
 
 function updateNpcs(state, dt) {
@@ -583,19 +601,18 @@ function updateNpcs(state, dt) {
         npc.y = GROUND_TOP;
         npc.vx = 0;
         npc.vy = 0;
-        npc.rotation = 0;
         npc.rotationVelocity = 0;
-        npc.mode = "recovering";
-        npc.behaviorTimer = NPC_CONFIG.recoveryDelay;
+        npc.rotation = npc.direction < 0 ? -Math.PI * 0.5 : Math.PI * 0.5;
+        npc.mode = "fallen";
+        npc.behaviorTimer = NPC_CONFIG.fallenDespawnDelay;
       }
       continue;
     }
 
-    if (npc.mode === "recovering") {
+    if (npc.mode === "fallen") {
       npc.behaviorTimer -= dt;
       if (npc.behaviorTimer <= 0) {
-        npc.mode = "walking";
-        npc.behaviorTimer = 1.8 + npc.behaviorSeed * 1.8;
+        npc.mode = "removed";
       }
       continue;
     }
@@ -627,6 +644,8 @@ function updateNpcs(state, dt) {
       }
     }
   }
+
+  state.world.npcs = state.world.npcs.filter((npc) => npc.mode !== "removed");
 }
 
 function throwNpcWithSpear(state, npc) {
@@ -635,9 +654,18 @@ function throwNpcWithSpear(state, npc) {
   npc.vy = Math.min(-90, state.spear.vy * 0.24 - NPC_CONFIG.hitLift);
   npc.rotationVelocity = clamp(state.spear.vx * 0.012, -9, 9);
   npc.hitFlash = 1;
-  npc.behaviorTimer = NPC_CONFIG.recoveryDelay;
+  npc.behaviorTimer = NPC_CONFIG.fallenDespawnDelay;
   npc.direction = state.spear.vx < 0 ? -1 : 1;
+  state.world.defeatedNpcIds.add(npc.id);
   state.score.npcHits += 1;
+}
+
+function relocatePlayerToSpear(state) {
+  state.player.x = state.spear.x;
+  state.player.y = state.spear.y;
+  state.teleportPulse = 1;
+  state.world.maxProgressX = Math.max(state.world.maxProgressX, state.player.x);
+  refreshWorldForFocus(state, state.player.x);
 }
 
 function isNpcWalkBlocked(surfaces, npc, nextX) {
