@@ -305,6 +305,7 @@ function drawSpikes(hazard) {
 }
 
 
+
 function drawLaser(hazard) {
   const scale = GAME_CONFIG.cameraZoom;
   const p = worldToScreen(hazard.x, hazard.y);
@@ -320,36 +321,51 @@ function drawLaser(hazard) {
     return;
   }
 
+  const sourceSide = hazard.laser?.sourceSide === "right" ? "right" : "left";
+  const centerY = p.y + height * 0.5;
+  const sourceX = sourceSide === "left" ? p.x : p.x + width;
+  const receiverX = sourceSide === "left" ? p.x + width : p.x;
+  const emitterRadius = 11 * scale;
+
   ctx.save();
 
-  const emitterRadius = 10 * scale;
+  // The wall hardware is always visible. Only the energy beam switches on/off.
   ctx.fillStyle = "#263444";
   ctx.strokeStyle = hazard.active ? "#ff7a87" : "#61778d";
   ctx.lineWidth = 2;
+
   ctx.beginPath();
-  ctx.arc(p.x - 8 * scale, p.y + height * 0.5, emitterRadius, 0, Math.PI * 2);
+  ctx.arc(sourceX, centerY, emitterRadius, 0, Math.PI * 2);
   ctx.fill();
   ctx.stroke();
+
+  ctx.fillStyle = "#1b2532";
+  ctx.strokeStyle = "rgba(130, 158, 184, 0.8)";
   ctx.beginPath();
-  ctx.arc(p.x + width + 8 * scale, p.y + height * 0.5, emitterRadius, 0, Math.PI * 2);
+  ctx.arc(receiverX, centerY, emitterRadius * 0.72, 0, Math.PI * 2);
   ctx.fill();
   ctx.stroke();
+
+  ctx.fillStyle = hazard.active ? "#ff536d" : "#5f7082";
+  ctx.beginPath();
+  ctx.arc(sourceX, centerY, emitterRadius * 0.34, 0, Math.PI * 2);
+  ctx.fill();
 
   if (hazard.active) {
     ctx.globalCompositeOperation = "lighter";
     ctx.shadowColor = "rgba(255, 70, 96, 0.95)";
     ctx.shadowBlur = 18;
-    ctx.fillStyle = "rgba(255, 67, 91, 0.9)";
+
+    ctx.fillStyle = "rgba(255, 67, 91, 0.88)";
     ctx.fillRect(p.x, p.y, width, height);
-    ctx.fillStyle = "rgba(255, 225, 230, 0.94)";
-    ctx.fillRect(p.x, p.y + height * 0.35, width, Math.max(1, height * 0.3));
-  } else {
-    ctx.strokeStyle = "rgba(255, 102, 123, 0.18)";
-    ctx.setLineDash([5, 9]);
-    ctx.beginPath();
-    ctx.moveTo(p.x, p.y + height * 0.5);
-    ctx.lineTo(p.x + width, p.y + height * 0.5);
-    ctx.stroke();
+
+    ctx.fillStyle = "rgba(255, 225, 230, 0.96)";
+    ctx.fillRect(
+      p.x,
+      p.y + height * 0.34,
+      width,
+      Math.max(1, height * 0.32)
+    );
   }
 
   ctx.restore();
@@ -564,22 +580,27 @@ function drawOrb() {
   ctx.restore();
 }
 
-function drawTimeFreezeField() {
+
+function drawSlowMotionField() {
   if (state.mode !== "airAiming") return;
 
   const p = worldToScreen(state.orb.x, state.orb.y);
   const phase = state.animation.clock;
 
   ctx.save();
-  ctx.fillStyle = "rgba(8, 18, 35, 0.22)";
+  ctx.fillStyle = "rgba(8, 18, 35, 0.12)";
   ctx.fillRect(0, 0, viewportWidth, viewportHeight);
 
-  ctx.strokeStyle = "rgba(132, 222, 255, 0.34)";
+  ctx.strokeStyle = "rgba(132, 222, 255, 0.4)";
   ctx.lineWidth = 1.5;
+
   for (let i = 0; i < 3; i += 1) {
-    const radius = 34 + i * 20 + Math.sin(phase * 3 + i) * 2;
+    const radius = 34 + i * 20 + Math.sin(phase * 2.2 + i) * 3;
+    const sweep = Math.PI * (0.9 + i * 0.16);
+    const start = phase * (0.7 + i * 0.12) + i * 1.4;
+
     ctx.beginPath();
-    ctx.arc(p.x, p.y, radius, 0, Math.PI * 2);
+    ctx.arc(p.x, p.y, radius, start, start + sweep);
     ctx.stroke();
   }
 
@@ -621,7 +642,7 @@ function render() {
   drawHazards();
   drawDronesAndProjectiles();
   drawTrail();
-  drawTimeFreezeField();
+  drawSlowMotionField();
   drawAimGuide();
   drawOrb();
   drawEventPulse();
@@ -674,16 +695,16 @@ function updateHud() {
 
   if (state.mode === "airAiming") {
     statusNode.textContent =
-      `TIME FROZEN · POWER ${Math.round(state.launch.power * 100)}% · ${runStats}`;
+      `SLOW MOTION ${Math.round(GAME_CONFIG.airAimTimeScale * 100)}% · POWER ${Math.round(state.launch.power * 100)}% · ${runStats}`;
     hintNode.textContent =
-      "Everything is frozen. Drag a new direction and release to redirect the same orb.";
+      "The world keeps moving slowly while you aim. Drag a new direction and release to redirect.";
     return;
   }
 
   if (state.mode === "orb") {
     statusNode.textContent = `ENERGY FORM · ${runStats}`;
     hintNode.textContent =
-      "Zero gravity: keep your momentum upward, then freeze and redirect around lasers, wall spikes and drones.";
+      "Zero gravity: keep your momentum upward, then slow time and redirect around lasers, wall spikes and drones.";
     return;
   }
 
@@ -693,7 +714,7 @@ function updateHud() {
 }
 
 function recordTrail() {
-  if (state.mode !== "orb") return;
+  if (state.mode !== "orb" && state.mode !== "airAiming") return;
 
   const previous = trail.at(-1);
   if (!previous || Math.hypot(state.orb.x - previous.x, state.orb.y - previous.y) > 8) {
