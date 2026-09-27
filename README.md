@@ -4,7 +4,7 @@ An experimental game-design repository for rapidly turning ideas into playable p
 
 This project is intentionally open-ended. It may become one game, several experiments, or a place to test unusual mechanics before deciding what deserves deeper development.
 
-## Current playable slice — Spear Relay 0.2
+## Current playable slice — Spear Relay 0.3
 
 The current prototype is a mobile-first 2D traversal mechanic:
 
@@ -13,12 +13,15 @@ The current prototype is a mobile-first 2D traversal mechanic:
 - drag distance controls throw power;
 - release to throw the spear;
 - while the spear is flying, the camera follows it;
-- the spear now collides with the floor, platforms and solid obstacles instead of passing through them;\n- press again while the spear is flying or planted to relocate the character to the spear's current position;
-- that same press immediately starts the next aiming gesture.
+- the spear now collides with the floor, platforms and solid obstacles instead of passing through them;
+- press again while the spear is flying or planted to relocate the character to the spear's current position;
+- that same press immediately starts the next aiming gesture;
+- the player now has procedural body posing for aiming and a short spear-throw follow-through;
+- relaying to a spear that is still in flight enters a distinct airborne aiming pose with slowed visual motion and a precision reticle.
 
-This deliberately tests the movement loop before adding enemies, platforms, progression, art production or a larger game concept.
+This deliberately tests the movement loop before adding enemies, progression, production art or a larger game concept.
 
-The spear uses light ballistic gravity. There is no terrain collision or death state yet; those are intentionally outside this first mechanic test.
+The spear uses light ballistic gravity. Terrain collision is active for the spear; enemies, damage, death and progression are still intentionally outside this mechanic test.
 
 ## Technical foundation
 
