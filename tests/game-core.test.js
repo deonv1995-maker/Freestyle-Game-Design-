@@ -63,6 +63,53 @@ test("pressing during flight relocates the character to the spear and starts aim
   assert.equal(state.player.y, spearY);
   assert.equal(state.spear.vx, 0);
   assert.equal(state.spear.vy, 0);
+  assert.equal(state.animation.airborneAim, true);
+  assert.equal(state.animation.playerAirborne, true);
+});
+
+
+test("grounded aiming does not enter the airborne slow-motion presentation state", () => {
+  const state = createGameState();
+
+  beginAim(state, 10, 20, 1);
+
+  assert.equal(state.animation.airborneAim, false);
+  assert.equal(state.animation.playerAirborne, false);
+});
+
+test("airborne aiming advances its visual clock at the configured slow-motion rate", () => {
+  const state = createGameState();
+
+  beginAim(state, 0, 0, 1);
+  updateAim(state, 180, -80, 1);
+  releaseAim(state, 1);
+  stepGame(state, 0.02);
+  beginAim(state, 20, 30, 2);
+
+  stepGame(state, 0.05);
+
+  assert.ok(state.animation.airborneAimClock > 0);
+  assert.ok(
+    state.animation.airborneAimClock <=
+      0.05 * GAME_CONFIG.airborneAimVisualTimeScale + 0.000001
+  );
+});
+
+test("releasing a throw records direction and starts a short follow-through animation", () => {
+  const state = createGameState();
+
+  beginAim(state, 0, 0, 5);
+  updateAim(state, 150, -60, 5);
+  releaseAim(state, 5);
+
+  assert.equal(state.animation.airborneAim, false);
+  assert.equal(state.animation.throwFollowThrough, 1);
+  assert.ok(state.animation.throwDirectionX > 0);
+  assert.ok(state.animation.throwDirectionY < 0);
+
+  stepGame(state, GAME_CONFIG.throwFollowThroughDuration * 0.5);
+  assert.ok(state.animation.throwFollowThrough < 1);
+  assert.ok(state.animation.throwFollowThrough > 0);
 });
 
 test("flight simulation applies gravity and advances the camera toward the spear", () => {
