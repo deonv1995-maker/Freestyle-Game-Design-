@@ -4,14 +4,14 @@ An experimental game-design repository for rapidly turning ideas into playable p
 
 This project is intentionally open-ended. It may become one game, several experiments, or a place to test unusual mechanics before deciding what deserves deeper development.
 
-## Current playable slice — Energy Relay 0.12
+## Current playable slice — Energy Relay 0.13
 
 - The player remains permanently in the blue energy-orb state; there is no human reform state.
 - Movement is now true zero-gravity/inertial motion: the orb has no constant downward acceleration. It keeps its current velocity until a redirect, collision or damping event changes it.
 - The run progresses from the bottom of the screen upward through a narrow space corridor with continuous left and right walls.
-- Drag in the direction of travel to launch from rest. While moving, press/hold to freeze gameplay and drag a new direction to redirect the same orb.
+- Drag in the direction of travel to launch from rest. While moving, press/hold to enter 20% slow motion and drag a new direction to redirect the same orb.
 - Side-wall and moving-platform contacts bounce the orb. Restitution and tangential damping bleed momentum, and a sufficiently low-speed impact settles the orb for another launch.
-- Hazards are oriented for vertical play: spikes project inward from the side walls and timed lasers span horizontally across the corridor while moving vertically.
+- Hazards are oriented for vertical play: spikes project inward from the side walls and persistent wall-mounted laser emitters switch full cross-corridor beams on and off without the laser hardware spawning or disappearing.
 - The orb has seven lives. A lethal hit respawns at the latest checkpoint with short invulnerability; losing the seventh life automatically starts a fresh run.
 - Checkpoints, difficulty, procedural streaming and distance records all use upward vertical progress as their single source of truth.
 - Targeting drones pursue within their active vertical chunk and fire projectiles. Direct orb contact destroys the drone without costing a life; fired projectiles remain lethal.
