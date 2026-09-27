@@ -81,6 +81,23 @@ test("a short tap reuses the previous aim instead of creating zero velocity", ()
   assert.ok(Math.hypot(state.orb.vx, state.orb.vy) >= GAME_CONFIG.minLaunchSpeed);
 });
 
+test("resting orb can launch upward directly from the floor", () => {
+  const state = createGameState();
+  const restingY = state.orb.y;
+
+  assert.equal(beginAim(state, 100, 100, 31), true);
+  assert.equal(updateAim(state, 100, 0, 31), true);
+  assert.equal(releaseAim(state, 31), true);
+  assert.ok(state.orb.vy < 0);
+
+  stepGame(state, 0.05);
+
+  assert.equal(state.mode, "orb");
+  assert.ok(state.orb.y < restingY);
+  assert.ok(state.orb.vy < 0);
+  assert.equal(state.orb.lastBounce, null);
+});
+
 test("cancelled aim returns the resting orb to ready", () => {
   const state = createGameState();
 
@@ -363,6 +380,42 @@ test("nearby drones eventually fire targeted projectiles", () => {
   }
 
   assert.ok(getWorldProjectiles(state).length > 0);
+});
+
+test("orb contact destroys a drone without costing a life", () => {
+  const state = createGameState();
+  const drone = getWorldDrones(state).find(
+    (candidate) => candidate.id === "starter-drone-0"
+  );
+  const startingLives = state.lives;
+
+  state.mode = "orb";
+  state.orb.x = drone.x - 62;
+  state.orb.y = drone.y;
+  state.orb.vx = 900;
+  state.orb.vy = 0;
+
+  stepGame(state, 0.05);
+
+  assert.equal(state.lives, startingLives);
+  assert.equal(state.mode, "orb");
+  assert.equal(
+    getWorldDrones(state).some((candidate) => candidate.id === drone.id),
+    false
+  );
+  assert.equal(state.world.destroyedDroneIds.has(drone.id), true);
+
+  assert.equal(
+    refreshWorldForFocus(
+      state,
+      WORLD_CONFIG.proceduralStartX + WORLD_CONFIG.chunkWidth + 20
+    ),
+    true
+  );
+  assert.equal(
+    getWorldDrones(state).some((candidate) => candidate.id === drone.id),
+    false
+  );
 });
 
 test("procedural hazard difficulty increases as checkpoint chunks advance", () => {
