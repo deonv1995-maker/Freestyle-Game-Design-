@@ -3,12 +3,16 @@ import assert from "node:assert/strict";
 
 import {
   GAME_CONFIG,
+  NPC_CONFIG,
   STARTER_SURFACES,
   WORLD_CONFIG,
   beginAim,
   createGameState,
+  findEarliestNpcCollision,
   findEarliestSurfaceCollision,
+  generateNpcChunk,
   generateWorldChunk,
+  getWorldNpcs,
   getWorldSurfaces,
   refreshWorldForFocus,
   releaseAim,
@@ -249,4 +253,78 @@ test("streamed procedural geometry participates in spear collision", () => {
 
   assert.ok(hit);
   assert.equal(hit.surface.id, obstacle.id);
+});
+
+
+test("camera uses a wider-than-1:1 world view", () => {
+  assert.ok(GAME_CONFIG.cameraZoom > 0);
+  assert.ok(GAME_CONFIG.cameraZoom < 1);
+});
+
+test("procedural NPC generation is deterministic and bounded per chunk", () => {
+  const first = generateNpcChunk(6);
+  const second = generateNpcChunk(6);
+
+  assert.deepEqual(first, second);
+  assert.equal(first.length, NPC_CONFIG.perChunk);
+  assert.ok(first.every((npc) => npc.x >= WORLD_CONFIG.proceduralStartX));
+  assert.ok(first.every((npc) => npc.patrolMax > npc.patrolMin));
+});
+
+test("walking NPCs patrol without requiring rendering state", () => {
+  const state = createGameState();
+  const npc = getWorldNpcs(state).find((candidate) => candidate.id === "starter-npc-1");
+
+  assert.ok(npc);
+  assert.equal(npc.mode, "walking");
+
+  const startX = npc.x;
+  stepGame(state, 0.05);
+
+  assert.notEqual(npc.x, startX);
+  assert.equal(npc.y, WORLD_CONFIG.groundTop);
+});
+
+test("spear collision throws an NPC and increments the run hit counter", () => {
+  const state = createGameState();
+  const npc = getWorldNpcs(state).find((candidate) => candidate.id === "starter-npc-0");
+
+  state.mode = "flying";
+  state.spear.x = npc.x - 60;
+  state.spear.y = npc.y - 30;
+  state.spear.vx = 1200;
+  state.spear.vy = 0;
+
+  const predictedHit = findEarliestNpcCollision(
+    state,
+    state.spear.x,
+    state.spear.y,
+    state.spear.x + 60,
+    state.spear.y
+  );
+  assert.ok(predictedHit);
+  assert.equal(predictedHit.npc.id, npc.id);
+
+  stepGame(state, 0.05);
+
+  assert.equal(state.score.npcHits, 1);
+  assert.equal(npc.mode, "thrown");
+  assert.ok(Math.abs(npc.vx) > 0);
+  assert.ok(npc.vy < 0);
+
+  stepGame(state, 0.05);
+  assert.equal(state.score.npcHits, 1);
+});
+
+test("NPC streaming stays bounded as procedural progress advances", () => {
+  const state = createGameState();
+  const farX = WORLD_CONFIG.proceduralStartX + WORLD_CONFIG.chunkWidth * 50 + 100;
+
+  refreshWorldForFocus(state, farX);
+
+  const maximumExpected =
+    3 +
+    (WORLD_CONFIG.chunksBehind + WORLD_CONFIG.chunksAhead + 1) * NPC_CONFIG.perChunk;
+
+  assert.ok(getWorldNpcs(state).length <= maximumExpected);
 });
