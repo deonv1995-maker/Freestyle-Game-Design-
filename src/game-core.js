@@ -44,7 +44,7 @@ export const HAZARD_CONFIG = Object.freeze({
   spikeMinSpan: 118,
   spikeMaxSpan: 188,
   laserHeight: 12,
-  laserWallInset: 12,
+  laserWallInset: 0,
   laserBaseCycle: 2.8,
   laserMinimumCycle: 1.35,
   laserBaseActiveRatio: 0.5,
@@ -366,19 +366,37 @@ export function cancelAim(state, pointerId = state.launch.pointerId) {
 }
 
 
+
 export function stepGame(state, deltaSeconds) {
   const dt = clamp(deltaSeconds, 0, 0.05);
-
-  state.animation.clock += dt;
-  state.animation.transformPulse = Math.max(0, state.animation.transformPulse - dt * 3.5);
-  state.animation.bouncePulse = Math.max(0, state.animation.bouncePulse - dt * 5);
-  state.animation.deathPulse = Math.max(0, state.animation.deathPulse - dt * 2.2);
-  state.animation.checkpointPulse = Math.max(0, state.animation.checkpointPulse - dt * 1.8);
-  state.animation.runResetPulse = Math.max(0, state.animation.runResetPulse - dt * 1.5);
-
   const gameplayScale =
     state.mode === "airAiming" ? GAME_CONFIG.airAimTimeScale : 1;
   const gameplayDt = dt * gameplayScale;
+
+  // Authoritative gameplay and gameplay-driven animation share the same time
+  // scale so re-aiming reads as true slow motion instead of a hidden physics
+  // slowdown under full-speed visuals.
+  state.animation.clock += gameplayDt;
+  state.animation.transformPulse = Math.max(
+    0,
+    state.animation.transformPulse - gameplayDt * 3.5
+  );
+  state.animation.bouncePulse = Math.max(
+    0,
+    state.animation.bouncePulse - gameplayDt * 5
+  );
+  state.animation.deathPulse = Math.max(
+    0,
+    state.animation.deathPulse - gameplayDt * 2.2
+  );
+  state.animation.checkpointPulse = Math.max(
+    0,
+    state.animation.checkpointPulse - gameplayDt * 1.8
+  );
+  state.animation.runResetPulse = Math.max(
+    0,
+    state.animation.runResetPulse - gameplayDt * 1.5
+  );
 
   state.world.clock += gameplayDt;
   state.orb.invulnerability = Math.max(
@@ -401,8 +419,8 @@ export function stepGame(state, deltaSeconds) {
   updateCheckpointProgress(state);
   pruneProjectiles(state);
 
-  // Camera interpolation remains presentation-time based so aiming still feels
-  // responsive while the world itself is running in slow motion.
+  // Camera interpolation remains presentation-time based so aiming stays
+  // readable and responsive while the world itself runs at the scaled rate.
   updateCamera(state, dt);
 }
 
