@@ -292,6 +292,18 @@ export function releaseSlingshot(state, pointerId = state.launch.pointerId) {
   return true;
 }
 
+export function cancelSlingshot(state, pointerId = state.launch.pointerId) {
+  if (state.mode !== "charging" || state.launch.pointerId !== pointerId) {
+    return false;
+  }
+
+  state.launch.pointerId = null;
+  state.launch.power = 0;
+  state.launch.dragDistance = 0;
+  state.mode = "ready";
+  return true;
+}
+
 export function beginSteering(state, pointerX, pointerY, pointerId = 0) {
   if (state.mode !== "orb" || state.steering.pointerId !== null) {
     return false;
