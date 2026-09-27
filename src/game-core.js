@@ -47,6 +47,7 @@ export const HAZARD_CONFIG = Object.freeze({
   laserWallInset: 0,
   laserBaseCycle: 7.2,
   laserMinimumCycle: 3.6,
+  laserBeamTravelDuration: 1.8,
   laserBaseActiveRatio: 0.5,
   laserMaxActiveRatio: 0.68,
   movingPlatformWidth: 170,
@@ -817,12 +818,16 @@ export function findEarliestHazardCollision(
 
   for (const hazard of state.world.hazards) {
     if (!hazard.active) continue;
+
+    const collisionRect = getHazardCollisionRect(hazard);
+    if (!collisionRect) continue;
+
     const hit = segmentRectIntersection(
       startX,
       startY,
       endX,
       endY,
-      expandedRect(hazard, radius)
+      expandedRect(collisionRect, radius)
     );
     if (!hit) continue;
 
@@ -1120,7 +1125,17 @@ function updateDynamicWorld(state) {
         state.world.clock + hazard.laser.phaseTime,
         hazard.laser.cycle
       );
-      hazard.active = phase < hazard.laser.cycle * hazard.laser.activeRatio;
+      const activeDuration = hazard.laser.cycle * hazard.laser.activeRatio;
+      const beamTravelDuration = Math.min(
+        HAZARD_CONFIG.laserBeamTravelDuration,
+        activeDuration
+      );
+
+      hazard.active = phase < activeDuration;
+      hazard.laser.beamProgress =
+        hazard.active && beamTravelDuration > 0
+          ? clamp(phase / beamTravelDuration, 0, 1)
+          : 0;
     } else {
       hazard.active = true;
     }
@@ -1345,6 +1360,28 @@ function cloneWorldItem(item) {
     ...item,
     motion: item.motion ? { ...item.motion } : undefined,
     laser: item.laser ? { ...item.laser } : undefined
+  };
+}
+
+function getHazardCollisionRect(hazard) {
+  if (hazard.type !== "laser" || !hazard.laser) {
+    return hazard;
+  }
+
+  const beamProgress = clamp(hazard.laser.beamProgress ?? 0, 0, 1);
+  const beamWidth = hazard.width * beamProgress;
+
+  if (beamWidth <= 1e-9) {
+    return null;
+  }
+
+  const sourceFromRight = hazard.laser.sourceSide === "right";
+
+  return {
+    x: sourceFromRight ? hazard.x + hazard.width - beamWidth : hazard.x,
+    y: hazard.y,
+    width: beamWidth,
+    height: hazard.height
   };
 }
 
