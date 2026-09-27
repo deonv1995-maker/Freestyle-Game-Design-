@@ -5,6 +5,7 @@ import {
   beginAim,
   cancelAim,
   createGameState,
+  getDroneExplosions,
   getLaunchVector,
   getWorldCheckpoints,
   getWorldDrones,
@@ -154,26 +155,48 @@ function drawCorridorShell(p, width, height, scale, type) {
   ctx.save();
 
   const leftWall = type === "leftWall";
-  const gradient = ctx.createLinearGradient(p.x, p.y, p.x + width, p.y);
-  gradient.addColorStop(0, leftWall ? "#121a27" : "#263347");
-  gradient.addColorStop(1, leftWall ? "#263347" : "#121a27");
+  const bottomWall = type === "bottomWall";
+  const gradient = bottomWall
+    ? ctx.createLinearGradient(p.x, p.y, p.x, p.y + height)
+    : ctx.createLinearGradient(p.x, p.y, p.x + width, p.y);
+
+  if (bottomWall) {
+    gradient.addColorStop(0, "#263347");
+    gradient.addColorStop(1, "#121a27");
+  } else {
+    gradient.addColorStop(0, leftWall ? "#121a27" : "#263347");
+    gradient.addColorStop(1, leftWall ? "#263347" : "#121a27");
+  }
 
   ctx.fillStyle = gradient;
   ctx.fillRect(p.x, p.y, width, height);
 
-  const edgeX = leftWall ? p.x + width - 5 * scale : p.x;
   ctx.fillStyle = "rgba(77, 215, 255, 0.5)";
-  ctx.fillRect(edgeX, p.y, Math.max(2, 4 * scale), height);
+  if (bottomWall) {
+    ctx.fillRect(p.x, p.y, width, Math.max(2, 4 * scale));
+  } else {
+    const edgeX = leftWall ? p.x + width - 5 * scale : p.x;
+    ctx.fillRect(edgeX, p.y, Math.max(2, 4 * scale), height);
+  }
 
   const panelStep = 112 * scale;
   ctx.strokeStyle = "rgba(155, 190, 216, 0.1)";
   ctx.lineWidth = 1;
 
-  for (let y = p.y + panelStep; y < p.y + height; y += panelStep) {
-    ctx.beginPath();
-    ctx.moveTo(p.x, y);
-    ctx.lineTo(p.x + width, y);
-    ctx.stroke();
+  if (bottomWall) {
+    for (let x = p.x + panelStep; x < p.x + width; x += panelStep) {
+      ctx.beginPath();
+      ctx.moveTo(x, p.y);
+      ctx.lineTo(x, p.y + height);
+      ctx.stroke();
+    }
+  } else {
+    for (let y = p.y + panelStep; y < p.y + height; y += panelStep) {
+      ctx.beginPath();
+      ctx.moveTo(p.x, y);
+      ctx.lineTo(p.x + width, y);
+      ctx.stroke();
+    }
   }
 
   ctx.restore();
@@ -438,6 +461,80 @@ function drawDronesAndProjectiles() {
   ctx.restore();
 }
 
+function drawDroneExplosions() {
+  const scale = GAME_CONFIG.cameraZoom;
+
+  for (const explosion of getDroneExplosions(state)) {
+    const p = worldToScreen(explosion.x, explosion.y);
+    if (
+      p.x < -100 ||
+      p.x > viewportWidth + 100 ||
+      p.y < -100 ||
+      p.y > viewportHeight + 100
+    ) {
+      continue;
+    }
+
+    const progress = Math.min(1, Math.max(0, explosion.age / explosion.duration));
+    const remaining = 1 - progress;
+    const innerRadius = (8 + progress * 18) * scale;
+    const ringRadius = (14 + progress * 44) * scale;
+
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+
+    const flash = ctx.createRadialGradient(
+      p.x,
+      p.y,
+      0,
+      p.x,
+      p.y,
+      Math.max(1, ringRadius)
+    );
+    flash.addColorStop(0, `rgba(255, 247, 214, ${0.95 * remaining})`);
+    flash.addColorStop(0.24, `rgba(255, 155, 92, ${0.82 * remaining})`);
+    flash.addColorStop(0.58, `rgba(255, 78, 105, ${0.48 * remaining})`);
+    flash.addColorStop(1, "rgba(255, 62, 91, 0)");
+
+    ctx.fillStyle = flash;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, ringRadius, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.strokeStyle = `rgba(255, 190, 122, ${0.9 * remaining})`;
+    ctx.lineWidth = Math.max(1.5, 3 * scale * remaining);
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, innerRadius, 0, Math.PI * 2);
+    ctx.stroke();
+
+    const shardCount = reduceMotion ? 4 : 8;
+    for (let i = 0; i < shardCount; i += 1) {
+      const angle =
+        explosion.phase +
+        (Math.PI * 2 * i) / shardCount +
+        progress * (i % 2 === 0 ? 0.28 : -0.22);
+      const start = (10 + progress * 10) * scale;
+      const end = (18 + progress * 48) * scale;
+      const sx = p.x + Math.cos(angle) * start;
+      const sy = p.y + Math.sin(angle) * start;
+      const ex = p.x + Math.cos(angle) * end;
+      const ey = p.y + Math.sin(angle) * end;
+
+      ctx.strokeStyle =
+        i % 2 === 0
+          ? `rgba(255, 219, 166, ${0.85 * remaining})`
+          : `rgba(255, 91, 116, ${0.72 * remaining})`;
+      ctx.lineWidth = Math.max(1, 2.2 * scale * remaining);
+      ctx.beginPath();
+      ctx.moveTo(sx, sy);
+      ctx.lineTo(ex, ey);
+      ctx.stroke();
+    }
+
+    ctx.restore();
+  }
+}
+
 function drawTrail() {
   if (trail.length < 2) return;
 
@@ -641,6 +738,7 @@ function render() {
   drawCheckpoints();
   drawHazards();
   drawDronesAndProjectiles();
+  drawDroneExplosions();
   drawTrail();
   drawSlowMotionField();
   drawAimGuide();
