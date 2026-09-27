@@ -227,3 +227,11 @@ Decision: laser activation no longer makes the full cross-corridor beam exist in
 Decision: laser collision uses the same beam-progress value as rendering. The lethal rectangle therefore expands with the visible beam from the correct source wall instead of using the laser's full hardware span before the beam reaches it. Touch slow motion continues to slow beam travel automatically because both cadence and beam progress derive from the shared gameplay clock.
 
 Reason: the slower cadence should also be readable spatially; the player must be able to see the beam crossing the corridor rather than having an invisible full-width collision appear ahead of the visual effect.
+
+## 2026-09-27 — Spike hazards removed; lasers telegraph shutdown
+
+Decision: wall and roof spike hazards are removed from the authored starter area and procedural hazard generation. Laser hazards remain the environmental timing obstacle, while drones and projectiles retain the separate moving-threat role.
+
+Decision: laser shutdown warning is derived from the same authoritative phase used for beam activation. The final 0.7 seconds of each active window sets a `shutdownFlicker` state and alternates beam brightness at a centralized rate of 9 Hz. The beam remains lethal and visibly present throughout the warning window; only its brightness flickers, so collision never contradicts presentation.
+
+Reason: the course should emphasize readable timing and momentum decisions rather than static spike traps. A phase-driven flicker gives the player a clear cue that an active beam is about to switch off without introducing a second timer or desynchronized visual-only state.
