@@ -148,3 +148,14 @@ The same direct drag aiming contract is reused for both grounded launch and mida
 The frozen orb remains the camera focus and remains rendered as the same blue energy form. Rendering adds a subtle freeze field and uses the aim guide from the orb position rather than introducing a second targeting system.
 
 Reason: midair redirection should feel like temporarily stopping time to reconsider the trajectory, while preserving one aiming model, one orb physics system, the rebound/landing rules from 0.8, and repeatable mobile input without extra buttons.
+
+
+## 2026-09-27 — Prototype 0.10 turns traversal geometry into a futuristic vertical city
+
+Decision: the existing `ground`, `platform` and `obstacle` collision types remain authoritative gameplay semantics. Presentation is added as lightweight `visual` metadata on those same surface records rather than creating separate visual-only level objects or a second collision layout.
+
+Standable platforms may present as rooftop decks, landing pads or hover cars. Non-standable obstacles present as futuristic towers or spires and retain the rebound-only behavior established in 0.8. Generated tower height limits live in `CITY_CONFIG` beside the world generator.
+
+The minimum generated tower height is intentionally greater than the ballistic rise of a full-power 45-degree launch. This removes the obvious one-shot diagonal flyover while still allowing steeper launches and, more importantly, the repeatable midair freeze/redirection system from 0.9 to solve vertical routes.
+
+Reason: platforms and obstacles should have a clear purpose and visual identity without splitting rendering from collision truth, and the skyline should create traversal decisions that make the orb's redirection power matter.
