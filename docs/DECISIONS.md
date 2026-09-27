@@ -137,3 +137,14 @@ World contact is no longer treated as one universal stop condition. The orb is c
 All other solid-world contacts are rebounds. Side impacts reflect horizontal momentum, underside impacts reflect vertical momentum, and obstacle surfaces—including obstacle tops—reflect the orb instead of reforming the player. A small separation offset is applied after reflection so the next physics step begins outside the contact boundary and does not repeatedly re-hit the same face.
 
 Reason: the character should never hang from a wall, platform edge or ceiling. Landing/reforming is a semantic gameplay action reserved for standable top surfaces, while non-standable geometry behaves as a physical rebound surface.
+
+
+## 2026-09-27 — Prototype 0.9 adds repeatable midair time-freeze redirection
+
+Decision: pressing while the player is already in orb form enters an `airAiming` gameplay state at the orb's exact current position. Orb physics, gravity, collision advancement and NPC simulation pause while this state is active. Cosmetic energy animation may continue so the frozen state remains visually readable.
+
+The same direct drag aiming contract is reused for both grounded launch and midair redirect. Grounded release creates a new orb burst and increments the burst count. Midair release changes the existing orb's velocity in place, does not move its position, does not create a new burst, and returns to normal orb flight. Cancelling a midair aim resumes the pre-existing orb velocity.
+
+The frozen orb remains the camera focus and remains rendered as the same blue energy form. Rendering adds a subtle freeze field and uses the aim guide from the orb position rather than introducing a second targeting system.
+
+Reason: midair redirection should feel like temporarily stopping time to reconsider the trajectory, while preserving one aiming model, one orb physics system, the rebound/landing rules from 0.8, and repeatable mobile input without extra buttons.

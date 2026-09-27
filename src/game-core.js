@@ -203,25 +203,46 @@ export function createGameState() {
 }
 
 export function beginAim(state, pointerX, pointerY, pointerId = 0) {
-  if (state.mode !== "ready" || state.launch.pointerId !== null) {
+  const beginningFromGround = state.mode === "ready";
+  const beginningFromOrb = state.mode === "orb";
+
+  if ((!beginningFromGround && !beginningFromOrb) || state.launch.pointerId !== null) {
     return false;
   }
 
-  state.mode = "aiming";
+  state.mode = beginningFromOrb ? "airAiming" : "aiming";
   state.launch.pointerId = pointerId;
   state.launch.startX = pointerX;
   state.launch.startY = pointerY;
   state.launch.currentX = pointerX;
   state.launch.currentY = pointerY;
-  state.launch.dx = state.lastLaunch.dx;
-  state.launch.dy = state.lastLaunch.dy;
-  state.launch.power = state.lastLaunch.power;
+
+  if (beginningFromOrb) {
+    const speed = Math.hypot(state.orb.vx, state.orb.vy);
+    const safeSpeed = Math.max(speed, 1);
+    state.launch.dx = (state.orb.vx / safeSpeed) * GAME_CONFIG.maxAimDistance;
+    state.launch.dy = (state.orb.vy / safeSpeed) * GAME_CONFIG.maxAimDistance;
+    state.launch.power = clamp(
+      (speed - GAME_CONFIG.minLaunchSpeed) /
+        (GAME_CONFIG.maxLaunchSpeed - GAME_CONFIG.minLaunchSpeed),
+      0.18,
+      1
+    );
+  } else {
+    state.launch.dx = state.lastLaunch.dx;
+    state.launch.dy = state.lastLaunch.dy;
+    state.launch.power = state.lastLaunch.power;
+  }
+
   state.launch.dragDistance = 0;
   return true;
 }
 
 export function updateAim(state, pointerX, pointerY, pointerId = 0) {
-  if (state.mode !== "aiming" || state.launch.pointerId !== pointerId) {
+  if (
+    (state.mode !== "aiming" && state.mode !== "airAiming") ||
+    state.launch.pointerId !== pointerId
+  ) {
     return false;
   }
 
@@ -248,7 +269,12 @@ export function updateAim(state, pointerX, pointerY, pointerId = 0) {
 }
 
 export function releaseAim(state, pointerId = state.launch.pointerId) {
-  if (state.mode !== "aiming" || state.launch.pointerId !== pointerId) {
+  const redirectingMidAir = state.mode === "airAiming";
+
+  if (
+    (state.mode !== "aiming" && !redirectingMidAir) ||
+    state.launch.pointerId !== pointerId
+  ) {
     return false;
   }
 
@@ -260,14 +286,19 @@ export function releaseAim(state, pointerId = state.launch.pointerId) {
     state.launch.power * (GAME_CONFIG.maxLaunchSpeed - GAME_CONFIG.minLaunchSpeed);
 
   state.orb.active = true;
-  state.orb.x = state.player.x;
-  state.orb.y = state.player.y - 28;
   state.orb.vx = aim.x * speed;
   state.orb.vy = aim.y * speed;
-  state.orb.travel = 0;
   state.orb.contact = null;
   state.orb.lastBounce = null;
 
+  if (redirectingMidAir) {
+    state.mode = "orb";
+    return true;
+  }
+
+  state.orb.x = state.player.x;
+  state.orb.y = state.player.y - 28;
+  state.orb.travel = 0;
   state.animation.transformPulse = 1;
   state.animation.bouncePulse = 0;
   state.mode = "orb";
@@ -276,12 +307,16 @@ export function releaseAim(state, pointerId = state.launch.pointerId) {
 }
 
 export function cancelAim(state, pointerId = state.launch.pointerId) {
-  if (state.mode !== "aiming" || state.launch.pointerId !== pointerId) {
+  if (
+    (state.mode !== "aiming" && state.mode !== "airAiming") ||
+    state.launch.pointerId !== pointerId
+  ) {
     return false;
   }
 
+  const redirectingMidAir = state.mode === "airAiming";
   state.launch.pointerId = null;
-  state.mode = "ready";
+  state.mode = redirectingMidAir ? "orb" : "ready";
   return true;
 }
 
@@ -293,7 +328,10 @@ export function stepGame(state, deltaSeconds) {
   state.animation.reformPulse = Math.max(0, state.animation.reformPulse - dt * 3);
   state.animation.bouncePulse = Math.max(0, state.animation.bouncePulse - dt * 5);
 
-  updateNpcs(state, dt);
+  const gameplayFrozen = state.mode === "airAiming";
+  if (!gameplayFrozen) {
+    updateNpcs(state, dt);
+  }
 
   if (state.mode === "orb") {
     const startX = state.orb.x;
@@ -353,13 +391,16 @@ export function stepGame(state, deltaSeconds) {
       state.orb.y = nextY;
       state.orb.travel += Math.hypot(nextX - startX, nextY - startY);
     }
+  } else if (state.mode === "airAiming") {
+    refreshWorldForFocus(state, state.orb.x);
   } else {
     refreshWorldForFocus(state, state.player.x);
     state.orb.x = state.player.x;
     state.orb.y = state.player.y - 28;
   }
 
-  const target = state.mode === "orb" ? state.orb : state.player;
+  const target =
+    state.mode === "orb" || state.mode === "airAiming" ? state.orb : state.player;
   const cameraBlend = 1 - Math.exp(-GAME_CONFIG.cameraSharpness * dt);
   state.camera.x += (target.x - state.camera.x) * cameraBlend;
   state.camera.y += (target.y - state.camera.y) * cameraBlend;
