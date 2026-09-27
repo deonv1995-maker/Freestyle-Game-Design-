@@ -4,21 +4,25 @@ An experimental game-design repository for rapidly turning ideas into playable p
 
 This project is intentionally open-ended. It may become one game, several experiments, or a place to test unusual mechanics before deciding what deserves deeper development.
 
-## Current playable slice — Energy Relay 0.7
+## Current playable slice — Energy Relay 0.8
 
-The current prototype is a mobile-first 2D traversal mechanic built around a character transformation power rather than a thrown weapon:
+The current prototype is a mobile-first 2D traversal mechanic built around a character transformation power:
 
 - the player begins in normal human form;
-- the **left half of the screen** is the initiation zone;
-- press on the left and **pull backward like a slingshot**;
-- the pull direction is opposite the launch direction, so the gesture both aims and charges the power;
-- release to transform the character into a bright blue energy orb and launch;
-- the **right half of the screen** becomes a steering zone while orb form is active;
-- hold and drag on the right like a virtual joystick to bend the orb's flight;
-- the camera follows the orb from the existing zoomed-out traversal view;
+- press and hold **anywhere on the game area**;
+- drag in the direction you want the character to travel;
+- drag distance controls launch power;
+- release to transform into the existing bright blue lightning-energy orb and launch;
+- the camera follows the orb from the zoomed-out traversal view;
 - hitting an NPC knocks it down, lets it fall, then removes it while incrementing the per-run hit counter;
-- hitting the floor, a platform, or an obstacle ends orb form and reforms the player at that exact impact point;
+- side impacts against walls, obstacles and platforms now rebound instead of trapping the character;
+- underside impacts against platforms also rebound;
+- obstacle tops are non-standable and rebound the orb;
+- only a downward landing on the **top of ground or a platform** ends orb form;
+- on a valid landing the character reforms standing on that surface;
 - the procedural course and deterministic bounded NPC/world streaming remain the source of truth for endless traversal.
+
+The energy-orb visual treatment from 0.7 is preserved: blue core, glow, lightning arcs, transformation pulse and energy trail. A short impact ring now makes rebounds easier to read.
 
 The handmade opening section still flows into an endless deterministic traversal course. Nearby world chunks are generated from a fixed seed and distant chunks are discarded and regenerated identically when needed, keeping runtime state bounded for mobile.
 

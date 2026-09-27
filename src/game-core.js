@@ -4,13 +4,12 @@ export const GAME_CONFIG = Object.freeze({
   orbGravity: 240,
   minLaunchSpeed: 280,
   maxLaunchSpeed: 980,
-  maxDrawDistance: 220,
+  maxAimDistance: 220,
   aimDeadzone: 14,
   orbRadius: 16,
-  steeringAcceleration: 920,
-  steeringMaxDistance: 130,
-  steeringDeadzone: 10,
   maxOrbSpeed: 1180,
+  bounceRestitution: 0.78,
+  bounceSeparation: 1.25,
   cameraSharpness: 10,
   cameraZoom: 0.78
 });
@@ -145,9 +144,9 @@ const CHUNK_PATTERNS = Object.freeze([
 ]);
 
 const DEFAULT_LAUNCH = Object.freeze({
-  dx: 1,
-  dy: -0.35,
-  power: 0
+  dx: 150,
+  dy: -72,
+  power: 0.58
 });
 
 const START_POSITION = Object.freeze({ x: -120, y: GROUND_TOP });
@@ -167,7 +166,8 @@ export function createGameState() {
       vx: 0,
       vy: 0,
       travel: 0,
-      contact: null
+      contact: null,
+      lastBounce: null
     },
     launch: {
       pointerId: null,
@@ -177,23 +177,15 @@ export function createGameState() {
       currentY: 0,
       dx: DEFAULT_LAUNCH.dx,
       dy: DEFAULT_LAUNCH.dy,
-      power: 0,
+      power: DEFAULT_LAUNCH.power,
       dragDistance: 0
     },
-    steering: {
-      pointerId: null,
-      startX: 0,
-      startY: 0,
-      currentX: 0,
-      currentY: 0,
-      x: 0,
-      y: 0,
-      strength: 0
-    },
+    lastLaunch: { ...DEFAULT_LAUNCH },
     animation: {
       clock: 0,
       transformPulse: 0,
-      reformPulse: 0
+      reformPulse: 0,
+      bouncePulse: 0
     },
     camera: { ...START_POSITION },
     world: {
@@ -210,63 +202,57 @@ export function createGameState() {
   return state;
 }
 
-export function beginSlingshot(state, pointerX, pointerY, pointerId = 0) {
+export function beginAim(state, pointerX, pointerY, pointerId = 0) {
   if (state.mode !== "ready" || state.launch.pointerId !== null) {
     return false;
   }
 
-  state.mode = "charging";
+  state.mode = "aiming";
   state.launch.pointerId = pointerId;
   state.launch.startX = pointerX;
   state.launch.startY = pointerY;
   state.launch.currentX = pointerX;
   state.launch.currentY = pointerY;
-  state.launch.dx = DEFAULT_LAUNCH.dx;
-  state.launch.dy = DEFAULT_LAUNCH.dy;
-  state.launch.power = 0;
+  state.launch.dx = state.lastLaunch.dx;
+  state.launch.dy = state.lastLaunch.dy;
+  state.launch.power = state.lastLaunch.power;
   state.launch.dragDistance = 0;
   return true;
 }
 
-export function updateSlingshot(state, pointerX, pointerY, pointerId = 0) {
-  if (state.mode !== "charging" || state.launch.pointerId !== pointerId) {
+export function updateAim(state, pointerX, pointerY, pointerId = 0) {
+  if (state.mode !== "aiming" || state.launch.pointerId !== pointerId) {
     return false;
   }
 
   state.launch.currentX = pointerX;
   state.launch.currentY = pointerY;
 
-  const pullX = pointerX - state.launch.startX;
-  const pullY = pointerY - state.launch.startY;
-  const pullDistance = Math.hypot(pullX, pullY);
-  state.launch.dragDistance = pullDistance;
+  const rawX = pointerX - state.launch.startX;
+  const rawY = pointerY - state.launch.startY;
+  const distance = Math.hypot(rawX, rawY);
+  state.launch.dragDistance = distance;
 
-  if (pullDistance >= GAME_CONFIG.aimDeadzone) {
-    const scale = Math.min(1, GAME_CONFIG.maxDrawDistance / pullDistance);
-    state.launch.dx = -pullX * scale;
-    state.launch.dy = -pullY * scale;
-    state.launch.power = clamp(pullDistance / GAME_CONFIG.maxDrawDistance, 0, 1);
-  } else {
-    state.launch.dx = DEFAULT_LAUNCH.dx;
-    state.launch.dy = DEFAULT_LAUNCH.dy;
-    state.launch.power = 0;
+  if (distance >= GAME_CONFIG.aimDeadzone) {
+    const scale = Math.min(1, GAME_CONFIG.maxAimDistance / distance);
+    state.launch.dx = rawX * scale;
+    state.launch.dy = rawY * scale;
+    state.launch.power = clamp(distance / GAME_CONFIG.maxAimDistance, 0.18, 1);
+
+    state.lastLaunch.dx = state.launch.dx;
+    state.lastLaunch.dy = state.launch.dy;
+    state.lastLaunch.power = state.launch.power;
   }
 
   return true;
 }
 
-export function releaseSlingshot(state, pointerId = state.launch.pointerId) {
-  if (state.mode !== "charging" || state.launch.pointerId !== pointerId) {
+export function releaseAim(state, pointerId = state.launch.pointerId) {
+  if (state.mode !== "aiming" || state.launch.pointerId !== pointerId) {
     return false;
   }
 
   state.launch.pointerId = null;
-
-  if (state.launch.dragDistance < GAME_CONFIG.aimDeadzone) {
-    state.mode = "ready";
-    state.launch.power = 0;
-    return false;
-  }
 
   const aim = getLaunchVector(state);
   const speed =
@@ -280,85 +266,22 @@ export function releaseSlingshot(state, pointerId = state.launch.pointerId) {
   state.orb.vy = aim.y * speed;
   state.orb.travel = 0;
   state.orb.contact = null;
-
-  state.steering.pointerId = null;
-  state.steering.x = 0;
-  state.steering.y = 0;
-  state.steering.strength = 0;
+  state.orb.lastBounce = null;
 
   state.animation.transformPulse = 1;
+  state.animation.bouncePulse = 0;
   state.mode = "orb";
   state.burstCount += 1;
   return true;
 }
 
-export function cancelSlingshot(state, pointerId = state.launch.pointerId) {
-  if (state.mode !== "charging" || state.launch.pointerId !== pointerId) {
+export function cancelAim(state, pointerId = state.launch.pointerId) {
+  if (state.mode !== "aiming" || state.launch.pointerId !== pointerId) {
     return false;
   }
 
   state.launch.pointerId = null;
-  state.launch.power = 0;
-  state.launch.dragDistance = 0;
   state.mode = "ready";
-  return true;
-}
-
-export function beginSteering(state, pointerX, pointerY, pointerId = 0) {
-  if (state.mode !== "orb" || state.steering.pointerId !== null) {
-    return false;
-  }
-
-  state.steering.pointerId = pointerId;
-  state.steering.startX = pointerX;
-  state.steering.startY = pointerY;
-  state.steering.currentX = pointerX;
-  state.steering.currentY = pointerY;
-  state.steering.x = 0;
-  state.steering.y = 0;
-  state.steering.strength = 0;
-  return true;
-}
-
-export function updateSteering(state, pointerX, pointerY, pointerId = 0) {
-  if (state.mode !== "orb" || state.steering.pointerId !== pointerId) {
-    return false;
-  }
-
-  state.steering.currentX = pointerX;
-  state.steering.currentY = pointerY;
-
-  const rawX = pointerX - state.steering.startX;
-  const rawY = pointerY - state.steering.startY;
-  const distance = Math.hypot(rawX, rawY);
-
-  if (distance < GAME_CONFIG.steeringDeadzone) {
-    state.steering.x = 0;
-    state.steering.y = 0;
-    state.steering.strength = 0;
-    return true;
-  }
-
-  state.steering.x = rawX / distance;
-  state.steering.y = rawY / distance;
-  state.steering.strength = clamp(
-    (distance - GAME_CONFIG.steeringDeadzone) /
-      (GAME_CONFIG.steeringMaxDistance - GAME_CONFIG.steeringDeadzone),
-    0,
-    1
-  );
-  return true;
-}
-
-export function endSteering(state, pointerId = state.steering.pointerId) {
-  if (state.steering.pointerId !== pointerId) {
-    return false;
-  }
-
-  state.steering.pointerId = null;
-  state.steering.x = 0;
-  state.steering.y = 0;
-  state.steering.strength = 0;
   return true;
 }
 
@@ -368,18 +291,13 @@ export function stepGame(state, deltaSeconds) {
   state.animation.clock += dt;
   state.animation.transformPulse = Math.max(0, state.animation.transformPulse - dt * 3.5);
   state.animation.reformPulse = Math.max(0, state.animation.reformPulse - dt * 3);
+  state.animation.bouncePulse = Math.max(0, state.animation.bouncePulse - dt * 5);
 
   updateNpcs(state, dt);
 
   if (state.mode === "orb") {
     const startX = state.orb.x;
     const startY = state.orb.y;
-
-    if (state.steering.strength > 0) {
-      const acceleration = GAME_CONFIG.steeringAcceleration * state.steering.strength;
-      state.orb.vx += state.steering.x * acceleration * dt;
-      state.orb.vy += state.steering.y * acceleration * dt;
-    }
 
     state.orb.vy += GAME_CONFIG.orbGravity * dt;
 
@@ -394,7 +312,14 @@ export function stepGame(state, deltaSeconds) {
     const nextY = startY + state.orb.vy * dt;
 
     refreshWorldForFocus(state, nextX);
-    const surfaceHit = findEarliestSurfaceCollision(state, startX, startY, nextX, nextY);
+    const surfaceHit = findEarliestSurfaceCollision(
+      state,
+      startX,
+      startY,
+      nextX,
+      nextY,
+      GAME_CONFIG.orbRadius
+    );
     const npcHit = findEarliestNpcCollision(state, startX, startY, nextX, nextY);
 
     if (npcHit && (!surfaceHit || npcHit.t < surfaceHit.t)) {
@@ -408,17 +333,21 @@ export function stepGame(state, deltaSeconds) {
       state.orb.x = surfaceHit.x;
       state.orb.y = surfaceHit.y;
       state.orb.travel += Math.hypot(surfaceHit.x - startX, surfaceHit.y - startY);
-      state.orb.vx = 0;
-      state.orb.vy = 0;
-      state.orb.contact = {
-        surfaceId: surfaceHit.surface.id,
-        normalX: surfaceHit.normalX,
-        normalY: surfaceHit.normalY
-      };
-      state.orb.active = false;
-      reformPlayerAtOrbImpact(state);
-      state.mode = "ready";
-      endSteering(state);
+
+      if (isStandableLanding(surfaceHit, state.orb.vy)) {
+        state.orb.vx = 0;
+        state.orb.vy = 0;
+        state.orb.contact = {
+          surfaceId: surfaceHit.surface.id,
+          normalX: surfaceHit.normalX,
+          normalY: surfaceHit.normalY
+        };
+        state.orb.active = false;
+        reformPlayerAtLanding(state, surfaceHit);
+        state.mode = "ready";
+      } else {
+        bounceOrbFromSurface(state, surfaceHit);
+      }
     } else {
       state.orb.x = nextX;
       state.orb.y = nextY;
@@ -587,11 +516,27 @@ export function generateNpcChunk(chunkIndex, chunkSurfaces = null) {
   return npcs;
 }
 
-export function findEarliestSurfaceCollision(state, startX, startY, endX, endY) {
+export function findEarliestSurfaceCollision(
+  state,
+  startX,
+  startY,
+  endX,
+  endY,
+  radius = 0
+) {
   let earliest = null;
 
   for (const surface of state.world.surfaces) {
-    const hit = segmentRectIntersection(startX, startY, endX, endY, surface);
+    const collisionRect =
+      radius > 0
+        ? {
+            x: surface.x - radius,
+            y: surface.y - radius,
+            width: surface.width + radius * 2,
+            height: surface.height + radius * 2
+          }
+        : surface;
+    const hit = segmentRectIntersection(startX, startY, endX, endY, collisionRect);
     if (!hit) continue;
 
     if (!earliest || hit.t < earliest.t) {
@@ -712,9 +657,37 @@ function throwNpcWithOrb(state, npc) {
   state.score.npcHits += 1;
 }
 
-function reformPlayerAtOrbImpact(state) {
+function isStandableLanding(hit, incomingVy) {
+  return (
+    incomingVy > 0 &&
+    hit.normalY === -1 &&
+    (hit.surface.type === "ground" || hit.surface.type === "platform")
+  );
+}
+
+function bounceOrbFromSurface(state, hit) {
+  const dot = state.orb.vx * hit.normalX + state.orb.vy * hit.normalY;
+
+  if (dot < 0) {
+    const impulse = (1 + GAME_CONFIG.bounceRestitution) * dot;
+    state.orb.vx -= impulse * hit.normalX;
+    state.orb.vy -= impulse * hit.normalY;
+  }
+
+  state.orb.x += hit.normalX * GAME_CONFIG.bounceSeparation;
+  state.orb.y += hit.normalY * GAME_CONFIG.bounceSeparation;
+  state.orb.contact = null;
+  state.orb.lastBounce = {
+    surfaceId: hit.surface.id,
+    normalX: hit.normalX,
+    normalY: hit.normalY
+  };
+  state.animation.bouncePulse = 1;
+}
+
+function reformPlayerAtLanding(state, hit) {
   state.player.x = state.orb.x;
-  state.player.y = state.orb.y;
+  state.player.y = hit.surface.y;
   state.animation.reformPulse = 1;
   state.world.maxProgressX = Math.max(state.world.maxProgressX, state.player.x);
   refreshWorldForFocus(state, state.player.x);
