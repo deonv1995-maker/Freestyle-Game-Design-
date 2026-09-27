@@ -68,3 +68,13 @@ Spear movement uses swept segment-versus-rectangle collision each physics step. 
 The player's stored world position now represents the character's feet. This keeps an exact relay to a horizontal surface contact visually grounded without introducing a second correction/placement system.
 
 Reason: the world needs reliable collision for mobile traversal, high-speed throws must not tunnel through thin platforms, and world geometry should remain expandable without duplicating collision coordinates in rendering code.
+
+## 2026-09-27 — Airborne aiming uses presentation-layer bullet time
+
+Decision: relaying to a spear while it is still in flight enters an airborne aiming presentation state. The active spear flight is already stopped by the existing relay input contract, so the new slow-motion effect does not introduce a second physics timescale or alter throw/collision determinism.
+
+The gameplay state owns only the minimal animation flags and clocks needed to describe the pose: airborne aim, persistent airborne player pose, throw direction and normalized follow-through. Rendering owns the actual stick-figure posing, recoil, slow visual float, vignette/rings and precision reticle.
+
+Grounded aiming keeps the normal presentation. Releasing any aim starts a short throw follow-through, while releasing an airborne aim retains the airborne body pose until the next relay changes the character's placement context.
+
+Reason: the player should visibly wind up and follow through when throwing, and mid-air aiming should feel like hang-time/bullet-time without destabilizing the existing touch input, spear physics, collision or camera systems.
