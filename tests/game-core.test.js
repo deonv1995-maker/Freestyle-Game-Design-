@@ -330,6 +330,13 @@ test("swept hazard collision detects a wall spike field before tunneling through
     (hazard) => hazard.id === "starter-left-spikes"
   );
 
+  // The full-width starter laser now overlaps this spike's vertical band.
+  // Disable it here so this regression isolates swept collision with the spike.
+  const laser = getWorldHazards(state).find(
+    (hazard) => hazard.id === "starter-laser"
+  );
+  laser.active = false;
+
   const hit = findEarliestHazardCollision(
     state,
     spike.x + spike.width + 80,
