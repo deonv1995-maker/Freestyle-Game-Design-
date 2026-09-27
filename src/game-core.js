@@ -1,17 +1,18 @@
 const GROUND_TOP = 180;
 
 export const GAME_CONFIG = Object.freeze({
-  gravity: 680,
-  minThrowSpeed: 220,
-  maxThrowSpeed: 1040,
-  maxAimDistance: 220,
-  aimDeadzone: 12,
+  orbGravity: 240,
+  minLaunchSpeed: 280,
+  maxLaunchSpeed: 980,
+  maxDrawDistance: 220,
+  aimDeadzone: 14,
+  orbRadius: 16,
+  steeringAcceleration: 920,
+  steeringMaxDistance: 130,
+  steeringDeadzone: 10,
+  maxOrbSpeed: 1180,
   cameraSharpness: 10,
-  cameraZoom: 0.78,
-  handOffset: 30,
-  handHeight: 34,
-  throwFollowThroughDuration: 0.28,
-  airborneAimVisualTimeScale: 0.18
+  cameraZoom: 0.78
 });
 
 export const WORLD_CONFIG = Object.freeze({
@@ -33,7 +34,7 @@ export const NPC_CONFIG = Object.freeze({
   gravity: 680,
   hitVelocityScale: 0.58,
   hitLift: 170,
-  spearCarryThrough: 0.82,
+  orbCarryThrough: 0.9,
   fallenDespawnDelay: 0.18
 });
 
@@ -143,10 +144,10 @@ const CHUNK_PATTERNS = Object.freeze([
   ])
 ]);
 
-const DEFAULT_AIM = Object.freeze({
-  dx: 150,
-  dy: -72,
-  power: 0.58
+const DEFAULT_LAUNCH = Object.freeze({
+  dx: 1,
+  dy: -0.35,
+  power: 0
 });
 
 const START_POSITION = Object.freeze({ x: -120, y: GROUND_TOP });
@@ -154,43 +155,47 @@ const START_POSITION = Object.freeze({ x: -120, y: GROUND_TOP });
 export function createGameState() {
   const state = {
     mode: "ready",
-    throwCount: 0,
+    burstCount: 0,
     score: {
       npcHits: 0
     },
     player: { ...START_POSITION },
-    spear: {
+    orb: {
+      active: false,
       x: START_POSITION.x,
-      y: START_POSITION.y,
+      y: START_POSITION.y - 28,
       vx: 0,
       vy: 0,
-      angle: Math.atan2(DEFAULT_AIM.dy, DEFAULT_AIM.dx),
       travel: 0,
       contact: null
     },
-    aim: {
+    launch: {
       pointerId: null,
       startX: 0,
       startY: 0,
       currentX: 0,
       currentY: 0,
-      dx: DEFAULT_AIM.dx,
-      dy: DEFAULT_AIM.dy,
-      power: DEFAULT_AIM.power,
+      dx: DEFAULT_LAUNCH.dx,
+      dy: DEFAULT_LAUNCH.dy,
+      power: 0,
       dragDistance: 0
     },
-    lastAim: { ...DEFAULT_AIM },
+    steering: {
+      pointerId: null,
+      startX: 0,
+      startY: 0,
+      currentX: 0,
+      currentY: 0,
+      x: 0,
+      y: 0,
+      strength: 0
+    },
     animation: {
       clock: 0,
-      airborneAim: false,
-      playerAirborne: false,
-      airborneAimClock: 0,
-      throwFollowThrough: 0,
-      throwDirectionX: 1,
-      throwDirectionY: 0
+      transformPulse: 0,
+      reformPulse: 0
     },
     camera: { ...START_POSITION },
-    teleportPulse: 0,
     world: {
       maxProgressX: START_POSITION.x,
       activeStartChunk: null,
@@ -202,105 +207,146 @@ export function createGameState() {
   };
 
   refreshWorldForFocus(state, START_POSITION.x);
-  placeSpearInHand(state);
   return state;
 }
 
-export function beginAim(state, pointerX, pointerY, pointerId = 0) {
-  const relayedFromFlight = state.mode === "flying";
-  const spearDistanceFromPlayer = Math.hypot(
-    state.spear.x - state.player.x,
-    state.spear.y - state.player.y
-  );
-  const teleported =
-    relayedFromFlight || (state.mode === "stuck" && spearDistanceFromPlayer > 0.001);
-
-  if (teleported) {
-    relocatePlayerToSpear(state);
-  }
-
-  state.mode = "aiming";
-  state.spear.vx = 0;
-  state.spear.vy = 0;
-  state.spear.travel = 0;
-  state.spear.contact = null;
-
-  state.animation.airborneAim = relayedFromFlight;
-  state.animation.playerAirborne = relayedFromFlight;
-  state.animation.airborneAimClock = 0;
-  state.animation.throwFollowThrough = 0;
-
-  state.aim.pointerId = pointerId;
-  state.aim.startX = pointerX;
-  state.aim.startY = pointerY;
-  state.aim.currentX = pointerX;
-  state.aim.currentY = pointerY;
-  state.aim.dx = state.lastAim.dx;
-  state.aim.dy = state.lastAim.dy;
-  state.aim.power = state.lastAim.power;
-  state.aim.dragDistance = 0;
-
-  placeSpearInHand(state);
-  return { teleported };
-}
-
-export function updateAim(state, pointerX, pointerY, pointerId = 0) {
-  if (state.mode !== "aiming" || state.aim.pointerId !== pointerId) {
+export function beginSlingshot(state, pointerX, pointerY, pointerId = 0) {
+  if (state.mode !== "ready" || state.launch.pointerId !== null) {
     return false;
   }
 
-  state.aim.currentX = pointerX;
-  state.aim.currentY = pointerY;
-
-  const rawX = pointerX - state.aim.startX;
-  const rawY = pointerY - state.aim.startY;
-  const rawDistance = Math.hypot(rawX, rawY);
-  state.aim.dragDistance = rawDistance;
-
-  if (rawDistance >= GAME_CONFIG.aimDeadzone) {
-    const scale = Math.min(1, GAME_CONFIG.maxAimDistance / rawDistance);
-    state.aim.dx = rawX * scale;
-    state.aim.dy = rawY * scale;
-    state.aim.power = clamp(rawDistance / GAME_CONFIG.maxAimDistance, 0.18, 1);
-
-    state.lastAim.dx = state.aim.dx;
-    state.lastAim.dy = state.aim.dy;
-    state.lastAim.power = state.aim.power;
-  }
-
-  placeSpearInHand(state);
+  state.mode = "charging";
+  state.launch.pointerId = pointerId;
+  state.launch.startX = pointerX;
+  state.launch.startY = pointerY;
+  state.launch.currentX = pointerX;
+  state.launch.currentY = pointerY;
+  state.launch.dx = DEFAULT_LAUNCH.dx;
+  state.launch.dy = DEFAULT_LAUNCH.dy;
+  state.launch.power = 0;
+  state.launch.dragDistance = 0;
   return true;
 }
 
-export function releaseAim(state, pointerId = state.aim.pointerId) {
-  if (state.mode !== "aiming" || state.aim.pointerId !== pointerId) {
+export function updateSlingshot(state, pointerX, pointerY, pointerId = 0) {
+  if (state.mode !== "charging" || state.launch.pointerId !== pointerId) {
     return false;
   }
 
-  const length = Math.hypot(state.aim.dx, state.aim.dy) || 1;
-  const dirX = state.aim.dx / length;
-  const dirY = state.aim.dy / length;
+  state.launch.currentX = pointerX;
+  state.launch.currentY = pointerY;
+
+  const pullX = pointerX - state.launch.startX;
+  const pullY = pointerY - state.launch.startY;
+  const pullDistance = Math.hypot(pullX, pullY);
+  state.launch.dragDistance = pullDistance;
+
+  if (pullDistance >= GAME_CONFIG.aimDeadzone) {
+    const scale = Math.min(1, GAME_CONFIG.maxDrawDistance / pullDistance);
+    state.launch.dx = -pullX * scale;
+    state.launch.dy = -pullY * scale;
+    state.launch.power = clamp(pullDistance / GAME_CONFIG.maxDrawDistance, 0, 1);
+  } else {
+    state.launch.dx = DEFAULT_LAUNCH.dx;
+    state.launch.dy = DEFAULT_LAUNCH.dy;
+    state.launch.power = 0;
+  }
+
+  return true;
+}
+
+export function releaseSlingshot(state, pointerId = state.launch.pointerId) {
+  if (state.mode !== "charging" || state.launch.pointerId !== pointerId) {
+    return false;
+  }
+
+  state.launch.pointerId = null;
+
+  if (state.launch.dragDistance < GAME_CONFIG.aimDeadzone) {
+    state.mode = "ready";
+    state.launch.power = 0;
+    return false;
+  }
+
+  const aim = getLaunchVector(state);
   const speed =
-    GAME_CONFIG.minThrowSpeed +
-    state.aim.power * (GAME_CONFIG.maxThrowSpeed - GAME_CONFIG.minThrowSpeed);
-  const hand = getPlayerHandPosition(state);
+    GAME_CONFIG.minLaunchSpeed +
+    state.launch.power * (GAME_CONFIG.maxLaunchSpeed - GAME_CONFIG.minLaunchSpeed);
 
-  state.spear.x = hand.x + dirX * GAME_CONFIG.handOffset;
-  state.spear.y = hand.y + dirY * GAME_CONFIG.handOffset;
-  state.spear.vx = dirX * speed;
-  state.spear.vy = dirY * speed;
-  state.spear.angle = Math.atan2(dirY, dirX);
-  state.spear.travel = 0;
-  state.spear.contact = null;
+  state.orb.active = true;
+  state.orb.x = state.player.x;
+  state.orb.y = state.player.y - 28;
+  state.orb.vx = aim.x * speed;
+  state.orb.vy = aim.y * speed;
+  state.orb.travel = 0;
+  state.orb.contact = null;
 
-  state.animation.throwDirectionX = dirX;
-  state.animation.throwDirectionY = dirY;
-  state.animation.throwFollowThrough = 1;
-  state.animation.airborneAim = false;
+  state.steering.pointerId = null;
+  state.steering.x = 0;
+  state.steering.y = 0;
+  state.steering.strength = 0;
 
-  state.mode = "flying";
-  state.throwCount += 1;
-  state.aim.pointerId = null;
+  state.animation.transformPulse = 1;
+  state.mode = "orb";
+  state.burstCount += 1;
+  return true;
+}
+
+export function beginSteering(state, pointerX, pointerY, pointerId = 0) {
+  if (state.mode !== "orb" || state.steering.pointerId !== null) {
+    return false;
+  }
+
+  state.steering.pointerId = pointerId;
+  state.steering.startX = pointerX;
+  state.steering.startY = pointerY;
+  state.steering.currentX = pointerX;
+  state.steering.currentY = pointerY;
+  state.steering.x = 0;
+  state.steering.y = 0;
+  state.steering.strength = 0;
+  return true;
+}
+
+export function updateSteering(state, pointerX, pointerY, pointerId = 0) {
+  if (state.mode !== "orb" || state.steering.pointerId !== pointerId) {
+    return false;
+  }
+
+  state.steering.currentX = pointerX;
+  state.steering.currentY = pointerY;
+
+  const rawX = pointerX - state.steering.startX;
+  const rawY = pointerY - state.steering.startY;
+  const distance = Math.hypot(rawX, rawY);
+
+  if (distance < GAME_CONFIG.steeringDeadzone) {
+    state.steering.x = 0;
+    state.steering.y = 0;
+    state.steering.strength = 0;
+    return true;
+  }
+
+  state.steering.x = rawX / distance;
+  state.steering.y = rawY / distance;
+  state.steering.strength = clamp(
+    (distance - GAME_CONFIG.steeringDeadzone) /
+      (GAME_CONFIG.steeringMaxDistance - GAME_CONFIG.steeringDeadzone),
+    0,
+    1
+  );
+  return true;
+}
+
+export function endSteering(state, pointerId = state.steering.pointerId) {
+  if (state.steering.pointerId !== pointerId) {
+    return false;
+  }
+
+  state.steering.pointerId = null;
+  state.steering.x = 0;
+  state.steering.y = 0;
+  state.steering.strength = 0;
   return true;
 }
 
@@ -308,88 +354,82 @@ export function stepGame(state, deltaSeconds) {
   const dt = clamp(deltaSeconds, 0, 0.05);
 
   state.animation.clock += dt;
-
-  if (state.animation.airborneAim) {
-    state.animation.airborneAimClock += dt * GAME_CONFIG.airborneAimVisualTimeScale;
-  }
-
-  if (state.animation.throwFollowThrough > 0) {
-    state.animation.throwFollowThrough = Math.max(
-      0,
-      state.animation.throwFollowThrough - dt / GAME_CONFIG.throwFollowThroughDuration
-    );
-  }
+  state.animation.transformPulse = Math.max(0, state.animation.transformPulse - dt * 3.5);
+  state.animation.reformPulse = Math.max(0, state.animation.reformPulse - dt * 3);
 
   updateNpcs(state, dt);
 
-  if (state.mode === "flying") {
-    const startX = state.spear.x;
-    const startY = state.spear.y;
+  if (state.mode === "orb") {
+    const startX = state.orb.x;
+    const startY = state.orb.y;
 
-    state.spear.vy += GAME_CONFIG.gravity * dt;
-    const nextX = startX + state.spear.vx * dt;
-    const nextY = startY + state.spear.vy * dt;
+    if (state.steering.strength > 0) {
+      const acceleration = GAME_CONFIG.steeringAcceleration * state.steering.strength;
+      state.orb.vx += state.steering.x * acceleration * dt;
+      state.orb.vy += state.steering.y * acceleration * dt;
+    }
+
+    state.orb.vy += GAME_CONFIG.orbGravity * dt;
+
+    const speed = Math.hypot(state.orb.vx, state.orb.vy);
+    if (speed > GAME_CONFIG.maxOrbSpeed) {
+      const scale = GAME_CONFIG.maxOrbSpeed / speed;
+      state.orb.vx *= scale;
+      state.orb.vy *= scale;
+    }
+
+    const nextX = startX + state.orb.vx * dt;
+    const nextY = startY + state.orb.vy * dt;
 
     refreshWorldForFocus(state, nextX);
     const surfaceHit = findEarliestSurfaceCollision(state, startX, startY, nextX, nextY);
     const npcHit = findEarliestNpcCollision(state, startX, startY, nextX, nextY);
 
     if (npcHit && (!surfaceHit || npcHit.t < surfaceHit.t)) {
-      state.spear.x = npcHit.x;
-      state.spear.y = npcHit.y;
-      state.spear.travel += Math.hypot(npcHit.x - startX, npcHit.y - startY);
-      state.spear.angle = Math.atan2(state.spear.vy, state.spear.vx);
-      throwNpcWithSpear(state, npcHit.npc);
-      state.spear.vx *= NPC_CONFIG.spearCarryThrough;
-      state.spear.vy *= NPC_CONFIG.spearCarryThrough;
+      state.orb.x = npcHit.x;
+      state.orb.y = npcHit.y;
+      state.orb.travel += Math.hypot(npcHit.x - startX, npcHit.y - startY);
+      throwNpcWithOrb(state, npcHit.npc);
+      state.orb.vx *= NPC_CONFIG.orbCarryThrough;
+      state.orb.vy *= NPC_CONFIG.orbCarryThrough;
     } else if (surfaceHit) {
-      state.spear.x = surfaceHit.x;
-      state.spear.y = surfaceHit.y;
-      state.spear.travel += Math.hypot(surfaceHit.x - startX, surfaceHit.y - startY);
-      state.spear.angle = Math.atan2(state.spear.vy, state.spear.vx);
-      state.spear.vx = 0;
-      state.spear.vy = 0;
-      state.spear.contact = {
+      state.orb.x = surfaceHit.x;
+      state.orb.y = surfaceHit.y;
+      state.orb.travel += Math.hypot(surfaceHit.x - startX, surfaceHit.y - startY);
+      state.orb.vx = 0;
+      state.orb.vy = 0;
+      state.orb.contact = {
         surfaceId: surfaceHit.surface.id,
         normalX: surfaceHit.normalX,
         normalY: surfaceHit.normalY
       };
-      state.mode = "stuck";
-      relocatePlayerToSpear(state);
-      state.animation.playerAirborne = false;
-      state.animation.airborneAim = false;
+      state.orb.active = false;
+      reformPlayerAtOrbImpact(state);
+      state.mode = "ready";
+      endSteering(state);
     } else {
-      state.spear.x = nextX;
-      state.spear.y = nextY;
-      state.spear.travel += Math.hypot(nextX - startX, nextY - startY);
-      state.spear.angle = Math.atan2(state.spear.vy, state.spear.vx);
+      state.orb.x = nextX;
+      state.orb.y = nextY;
+      state.orb.travel += Math.hypot(nextX - startX, nextY - startY);
     }
-  } else if (state.mode !== "stuck") {
+  } else {
     refreshWorldForFocus(state, state.player.x);
-    placeSpearInHand(state);
+    state.orb.x = state.player.x;
+    state.orb.y = state.player.y - 28;
   }
 
-  const target = state.mode === "flying" || state.mode === "stuck" ? state.spear : state.player;
+  const target = state.mode === "orb" ? state.orb : state.player;
   const cameraBlend = 1 - Math.exp(-GAME_CONFIG.cameraSharpness * dt);
   state.camera.x += (target.x - state.camera.x) * cameraBlend;
   state.camera.y += (target.y - state.camera.y) * cameraBlend;
-
-  state.teleportPulse = Math.max(0, state.teleportPulse - dt * 2.6);
 }
 
-export function getAimVector(state) {
-  const length = Math.hypot(state.aim.dx, state.aim.dy) || 1;
+export function getLaunchVector(state) {
+  const length = Math.hypot(state.launch.dx, state.launch.dy) || 1;
   return {
-    x: state.aim.dx / length,
-    y: state.aim.dy / length,
-    power: state.aim.power
-  };
-}
-
-export function getPlayerHandPosition(state) {
-  return {
-    x: state.player.x,
-    y: state.player.y - GAME_CONFIG.handHeight
+    x: state.launch.dx / length,
+    y: state.launch.dy / length,
+    power: state.launch.power
   };
 }
 
@@ -648,22 +688,22 @@ function updateNpcs(state, dt) {
   state.world.npcs = state.world.npcs.filter((npc) => npc.mode !== "removed");
 }
 
-function throwNpcWithSpear(state, npc) {
+function throwNpcWithOrb(state, npc) {
   npc.mode = "thrown";
-  npc.vx = state.spear.vx * NPC_CONFIG.hitVelocityScale;
-  npc.vy = Math.min(-90, state.spear.vy * 0.24 - NPC_CONFIG.hitLift);
-  npc.rotationVelocity = clamp(state.spear.vx * 0.012, -9, 9);
+  npc.vx = state.orb.vx * NPC_CONFIG.hitVelocityScale;
+  npc.vy = Math.min(-90, state.orb.vy * 0.24 - NPC_CONFIG.hitLift);
+  npc.rotationVelocity = clamp(state.orb.vx * 0.012, -9, 9);
   npc.hitFlash = 1;
   npc.behaviorTimer = NPC_CONFIG.fallenDespawnDelay;
-  npc.direction = state.spear.vx < 0 ? -1 : 1;
+  npc.direction = state.orb.vx < 0 ? -1 : 1;
   state.world.defeatedNpcIds.add(npc.id);
   state.score.npcHits += 1;
 }
 
-function relocatePlayerToSpear(state) {
-  state.player.x = state.spear.x;
-  state.player.y = state.spear.y;
-  state.teleportPulse = 1;
+function reformPlayerAtOrbImpact(state) {
+  state.player.x = state.orb.x;
+  state.player.y = state.orb.y;
+  state.animation.reformPulse = 1;
   state.world.maxProgressX = Math.max(state.world.maxProgressX, state.player.x);
   refreshWorldForFocus(state, state.player.x);
 }
@@ -756,17 +796,7 @@ function seededUnit(chunkIndex, salt) {
   return (value >>> 0) / 4294967296;
 }
 
-function placeSpearInHand(state) {
-  const length = Math.hypot(state.aim.dx, state.aim.dy) || 1;
-  const dirX = state.aim.dx / length;
-  const dirY = state.aim.dy / length;
-  const hand = getPlayerHandPosition(state);
 
-  state.spear.x = hand.x + dirX * GAME_CONFIG.handOffset;
-  state.spear.y = hand.y + dirY * GAME_CONFIG.handOffset;
-  state.spear.angle = Math.atan2(dirY, dirX);
-  state.spear.contact = null;
-}
 
 function segmentRectIntersection(startX, startY, endX, endY, rect) {
   const dx = endX - startX;
