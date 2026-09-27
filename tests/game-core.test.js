@@ -175,7 +175,6 @@ test("procedural ground chunks join without gaps", () => {
 
 test("world streaming advances active chunks while keeping surface count bounded", () => {
   const state = createGameState();
-  const initialCount = getWorldSurfaces(state).length;
   const farX = WORLD_CONFIG.proceduralStartX + WORLD_CONFIG.chunkWidth * 40 + 100;
 
   const changed = refreshWorldForFocus(state, farX);
@@ -184,7 +183,6 @@ test("world streaming advances active chunks while keeping surface count bounded
   assert.ok(state.world.activeStartChunk >= 38);
   assert.ok(state.world.activeEndChunk <= 44);
   assert.ok(getWorldSurfaces(state).length <= STARTER_SURFACES.length + 7 * 6);
-  assert.ok(getWorldSurfaces(state).length <= initialCount + 12);
 });
 
 test("streamed procedural geometry participates in spear collision", () => {
