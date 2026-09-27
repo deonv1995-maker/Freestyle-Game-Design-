@@ -273,60 +273,9 @@ function drawHazards() {
   for (const hazard of getWorldHazards(state)) {
     if (hazard.type === "laser") {
       drawLaser(hazard);
-    } else {
-      drawSpikes(hazard);
     }
   }
 }
-
-
-function drawSpikes(hazard) {
-  const scale = GAME_CONFIG.cameraZoom;
-  const p = worldToScreen(hazard.x, hazard.y);
-  const width = hazard.width * scale;
-  const height = hazard.height * scale;
-
-  if (
-    p.x > viewportWidth + 80 ||
-    p.x + width < -80 ||
-    p.y > viewportHeight + 80 ||
-    p.y + height < -80
-  ) {
-    return;
-  }
-
-  const left = hazard.type === "leftSpikes";
-  const spikeHeight = Math.max(12, 24 * scale);
-  const count = Math.max(1, Math.ceil(height / spikeHeight));
-  const actualHeight = height / count;
-
-  ctx.save();
-  ctx.fillStyle = "#c7d5e3";
-  ctx.strokeStyle = "rgba(255, 94, 105, 0.72)";
-  ctx.lineWidth = 1.2;
-
-  for (let i = 0; i < count; i += 1) {
-    const top = p.y + i * actualHeight;
-    ctx.beginPath();
-
-    if (left) {
-      ctx.moveTo(p.x, top);
-      ctx.lineTo(p.x + width, top + actualHeight * 0.5);
-      ctx.lineTo(p.x, top + actualHeight);
-    } else {
-      ctx.moveTo(p.x + width, top);
-      ctx.lineTo(p.x, top + actualHeight * 0.5);
-      ctx.lineTo(p.x + width, top + actualHeight);
-    }
-
-    ctx.closePath();
-    ctx.fill();
-    ctx.stroke();
-  }
-
-  ctx.restore();
-}
-
 
 
 function drawLaser(hazard) {
@@ -356,6 +305,10 @@ function drawLaser(hazard) {
   const sourceX = sourceSide === "left" ? p.x : p.x + width;
   const receiverX = sourceSide === "left" ? p.x + width : p.x;
   const emitterRadius = 11 * scale;
+  const flickerLevel =
+    hazard.active && hazard.laser?.shutdownFlicker
+      ? Math.min(1, Math.max(0.35, hazard.laser.flickerLevel ?? 1))
+      : 1;
 
   ctx.save();
 
@@ -376,6 +329,7 @@ function drawLaser(hazard) {
   ctx.fill();
   ctx.stroke();
 
+  ctx.globalAlpha = flickerLevel;
   ctx.fillStyle = hazard.active ? "#ff536d" : "#5f7082";
   ctx.beginPath();
   ctx.arc(sourceX, centerY, emitterRadius * 0.34, 0, Math.PI * 2);
