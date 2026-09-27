@@ -57,3 +57,14 @@ Decision: the current browser-native Spear Relay gameplay remains the single sou
 Reason: phone testing now requires a real downloadable/installable application, but duplicating gameplay in a second Android implementation would create competing logic and slow iteration.
 
 The Android test package ID is `com.freestylegamedesign.spearrelay`. Automated test APKs use a repository-owned development signing key only so later test builds can update the installed app. That key is explicitly not a production/store signing identity.
+
+
+## 2026-09-27 — Prototype 0.2 introduces data-driven solid world geometry
+
+Decision: the first traversal world is defined by one `WORLD_SURFACES` collection in `game-core.js`. Ground, platforms and obstacles are all axis-aligned solid rectangles read by both collision and rendering instead of maintaining separate visual and physics layouts.
+
+Spear movement uses swept segment-versus-rectangle collision each physics step. On the first impact, the spear stops at the contact point and enters a planted/stuck state. Pressing while the spear is planted still performs the same relay action and immediately begins the next aim gesture.
+
+The player's stored world position now represents the character's feet. This keeps an exact relay to a horizontal surface contact visually grounded without introducing a second correction/placement system.
+
+Reason: the world needs reliable collision for mobile traversal, high-speed throws must not tunnel through thin platforms, and world geometry should remain expandable without duplicating collision coordinates in rendering code.

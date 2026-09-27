@@ -1,8 +1,9 @@
 import {
-  GAME_CONFIG,
+  WORLD_SURFACES,
   beginAim,
   createGameState,
   getAimVector,
+  getPlayerHandPosition,
   releaseAim,
   stepGame,
   updateAim
@@ -114,6 +115,54 @@ function drawWorldGrid() {
   ctx.restore();
 }
 
+function drawWorldSurfaces() {
+  ctx.save();
+
+  for (const surface of WORLD_SURFACES) {
+    const p = worldToScreen(surface.x, surface.y);
+
+    if (
+      p.x > viewportWidth + 80 ||
+      p.x + surface.width < -80 ||
+      p.y > viewportHeight + 80 ||
+      p.y + surface.height < -80
+    ) {
+      continue;
+    }
+
+    if (surface.type === "ground") {
+      ctx.fillStyle = "#202a25";
+      ctx.fillRect(p.x, p.y, surface.width, surface.height);
+      ctx.fillStyle = "#5f7a58";
+      ctx.fillRect(p.x, p.y, surface.width, 7);
+      ctx.fillStyle = "rgba(151, 184, 134, 0.42)";
+      for (let x = p.x + 16; x < p.x + surface.width; x += 34) {
+        ctx.fillRect(x, p.y - 4, 2, 6);
+      }
+      continue;
+    }
+
+    const isPlatform = surface.type === "platform";
+    ctx.fillStyle = isPlatform ? "#36465f" : "#493d48";
+    ctx.strokeStyle = isPlatform ? "#8499bb" : "#9f7f8a";
+    ctx.lineWidth = 2;
+    roundRect(ctx, p.x, p.y, surface.width, surface.height, isPlatform ? 6 : 4);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.strokeStyle = isPlatform
+      ? "rgba(203, 220, 244, 0.22)"
+      : "rgba(232, 199, 208, 0.18)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(p.x + 8, p.y + 6);
+    ctx.lineTo(p.x + surface.width - 8, p.y + 6);
+    ctx.stroke();
+  }
+
+  ctx.restore();
+}
+
 function drawTrail() {
   if (trail.length < 2) return;
 
@@ -139,7 +188,8 @@ function drawTrail() {
 function drawAimGuide() {
   if (state.mode !== "aiming") return;
 
-  const origin = worldToScreen(state.player.x, state.player.y);
+  const hand = getPlayerHandPosition(state);
+  const origin = worldToScreen(hand.x, hand.y);
   const aim = getAimVector(state);
   const guideLength = 90 + aim.power * 100;
   const endX = origin.x + aim.x * guideLength;
@@ -175,7 +225,7 @@ function drawAimGuide() {
 function drawTeleportPulse() {
   if (state.teleportPulse <= 0) return;
 
-  const p = worldToScreen(state.player.x, state.player.y);
+  const p = worldToScreen(state.player.x, state.player.y - 28);
   const progress = 1 - state.teleportPulse;
   const radius = 24 + progress * 48;
 
@@ -200,20 +250,20 @@ function drawPlayer() {
   ctx.lineCap = "round";
 
   ctx.beginPath();
-  ctx.arc(0, -25, 8, 0, Math.PI * 2);
+  ctx.arc(0, -51, 8, 0, Math.PI * 2);
   ctx.fill();
 
   ctx.beginPath();
-  ctx.moveTo(0, -16);
-  ctx.lineTo(0, 12);
-  ctx.moveTo(0, -5);
-  ctx.lineTo(-13, 5);
-  ctx.moveTo(0, -4);
-  ctx.lineTo(12, -11);
-  ctx.moveTo(0, 12);
-  ctx.lineTo(-10, 30);
-  ctx.moveTo(0, 12);
-  ctx.lineTo(11, 30);
+  ctx.moveTo(0, -42);
+  ctx.lineTo(0, -17);
+  ctx.moveTo(0, -34);
+  ctx.lineTo(-13, -25);
+  ctx.moveTo(0, -33);
+  ctx.lineTo(12, -39);
+  ctx.moveTo(0, -17);
+  ctx.lineTo(-10, 0);
+  ctx.moveTo(0, -17);
+  ctx.lineTo(11, 0);
   ctx.stroke();
 
   ctx.restore();
@@ -245,11 +295,20 @@ function drawSpear() {
   ctx.fillStyle = "#b38b52";
   ctx.fillRect(-32, -3, 8, 6);
 
+  if (state.mode === "stuck") {
+    ctx.strokeStyle = "rgba(255, 213, 106, 0.8)";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(0, 0, 12, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
   ctx.restore();
 }
 
 function render() {
   drawBackground();
+  drawWorldSurfaces();
   drawTrail();
   drawAimGuide();
   drawTeleportPulse();
@@ -264,6 +323,12 @@ function updateHud() {
     return;
   }
 
+  if (state.mode === "stuck") {
+    statusNode.textContent = `SPEAR PLANTED · THROW ${state.throwCount}`;
+    hintNode.textContent = "Hold the screen to relay onto this surface, slide to aim, then release.";
+    return;
+  }
+
   if (state.mode === "aiming") {
     statusNode.textContent = "AIMING";
     hintNode.textContent = "Slide in the throw direction. Release your finger to launch.";
@@ -271,7 +336,7 @@ function updateHud() {
   }
 
   statusNode.textContent = "READY";
-  hintNode.textContent = "Hold anywhere, slide to aim, release to throw.";
+  hintNode.textContent = "Use the floor, platforms and obstacles: hold, slide to aim, release to throw.";
 }
 
 function recordTrail() {
@@ -300,10 +365,10 @@ canvas.addEventListener("pointerdown", (event) => {
   event.preventDefault();
   canvas.setPointerCapture?.(event.pointerId);
 
-  const wasFlying = state.mode === "flying";
+  const wasRelaying = state.mode === "flying" || state.mode === "stuck";
   beginAim(state, event.clientX, event.clientY, event.pointerId);
 
-  if (wasFlying) {
+  if (wasRelaying) {
     trail = [];
   }
 
