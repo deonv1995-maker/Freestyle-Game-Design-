@@ -4,24 +4,25 @@ An experimental game-design repository for rapidly turning ideas into playable p
 
 This project is intentionally open-ended. It may become one game, several experiments, or a place to test unusual mechanics before deciding what deserves deeper development.
 
-## Current playable slice — Spear Relay 0.6
+## Current playable slice — Energy Relay 0.7
 
-The current prototype is a mobile-first 2D traversal mechanic:
+The current prototype is a mobile-first 2D traversal mechanic built around a character transformation power rather than a thrown weapon:
 
-- press and hold anywhere on the game area;
-- slide in the direction you want to throw;
-- drag distance controls throw power;
-- release to throw the spear;
-- while the spear is flying, the camera follows it from a wider zoomed-out view so more of the course remains visible;
-- the spear now collides with the floor, platforms and solid obstacles instead of passing through them;
-- press again while the spear is flying or planted to relocate the character to the spear's current position;
-- that same press immediately starts the next aiming gesture;
-- the player now visibly winds up, leans and follows through when aiming and throwing;
-- relaying to a spear that is still in flight enters a tucked airborne pose with slowed visual motion and a precision reticle;\n- lightweight NPCs now stand and patrol through the streamed world;\n- hitting an NPC with the spear knocks the NPC down with impact, then removes it from the active world and increments a per-run hit counter;\n- when the spear hits solid world geometry, the player now relocates to that exact impact point automatically, so the next press is only for aiming the next throw.
+- the player begins in normal human form;
+- the **left half of the screen** is the initiation zone;
+- press on the left and **pull backward like a slingshot**;
+- the pull direction is opposite the launch direction, so the gesture both aims and charges the power;
+- release to transform the character into a bright blue energy orb and launch;
+- the **right half of the screen** becomes a steering zone while orb form is active;
+- hold and drag on the right like a virtual joystick to bend the orb's flight;
+- the camera follows the orb from the existing zoomed-out traversal view;
+- hitting an NPC knocks it down, lets it fall, then removes it while incrementing the per-run hit counter;
+- hitting the floor, a platform, or an obstacle ends orb form and reforms the player at that exact impact point;
+- the procedural course and deterministic bounded NPC/world streaming remain the source of truth for endless traversal.
 
-The handmade opening section now flows into an endless deterministic traversal course. As play moves forward, nearby world chunks are generated from a fixed seed, each with continuous ground plus varied platforms and obstacles. Old distant procedural chunks are discarded and can be regenerated identically later, keeping runtime memory bounded on mobile.
+The handmade opening section still flows into an endless deterministic traversal course. Nearby world chunks are generated from a fixed seed and distant chunks are discarded and regenerated identically when needed, keeping runtime state bounded for mobile.
 
-The prototype is still focused on movement. NPCs are currently non-hostile traversal targets that disappear after their hit reaction; there is still no player damage, death state or larger progression system.
+The prototype remains focused on traversal feel. NPCs are non-hostile targets; there is still no player damage, death state or larger progression system.
 
 ## Technical foundation
 
