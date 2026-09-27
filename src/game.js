@@ -281,13 +281,16 @@ function drawTrail() {
 }
 
 function drawAimGuide() {
-  if (state.mode !== "aiming") return;
+  if (state.mode !== "aiming" && state.mode !== "airAiming") return;
 
   const aim = getLaunchVector(state);
-  const player = worldToScreen(state.player.x, state.player.y - 28);
+  const origin =
+    state.mode === "airAiming"
+      ? worldToScreen(state.orb.x, state.orb.y)
+      : worldToScreen(state.player.x, state.player.y - 28);
   const guideLength = 95 + aim.power * 150;
-  const endX = player.x + aim.x * guideLength;
-  const endY = player.y + aim.y * guideLength;
+  const endX = origin.x + aim.x * guideLength;
+  const endY = origin.y + aim.y * guideLength;
 
   ctx.save();
 
@@ -295,7 +298,7 @@ function drawAimGuide() {
   ctx.strokeStyle = "rgba(105, 207, 255, 0.8)";
   ctx.lineWidth = 2.2;
   ctx.beginPath();
-  ctx.moveTo(player.x, player.y);
+  ctx.moveTo(origin.x, origin.y);
   ctx.lineTo(endX, endY);
   ctx.stroke();
   ctx.setLineDash([]);
@@ -312,8 +315,8 @@ function drawAimGuide() {
   ctx.stroke();
 
   const barWidth = 104;
-  const barX = player.x - barWidth * 0.5;
-  const barY = player.y + 46;
+  const barX = origin.x - barWidth * 0.5;
+  const barY = origin.y + 46;
   ctx.fillStyle = "rgba(255,255,255,0.1)";
   roundRect(ctx, barX, barY, barWidth, 7, 4);
   ctx.fill();
@@ -342,7 +345,7 @@ function drawReformPulse() {
 }
 
 function drawPlayer() {
-  if (state.mode === "orb") return;
+  if (state.mode === "orb" || state.mode === "airAiming") return;
 
   const p = worldToScreen(state.player.x, state.player.y);
   const scale = GAME_CONFIG.cameraZoom;
@@ -411,7 +414,7 @@ function drawPlayer() {
 }
 
 function drawOrb() {
-  if (state.mode !== "orb" || !state.orb.active) return;
+  if ((state.mode !== "orb" && state.mode !== "airAiming") || !state.orb.active) return;
 
   const p = worldToScreen(state.orb.x, state.orb.y);
   const scale = GAME_CONFIG.cameraZoom;
@@ -480,11 +483,34 @@ function drawOrb() {
   ctx.restore();
 }
 
+function drawTimeFreezeField() {
+  if (state.mode !== "airAiming") return;
+
+  const p = worldToScreen(state.orb.x, state.orb.y);
+  const phase = state.animation.clock;
+
+  ctx.save();
+  ctx.fillStyle = "rgba(8, 18, 35, 0.2)";
+  ctx.fillRect(0, 0, viewportWidth, viewportHeight);
+
+  ctx.strokeStyle = "rgba(132, 222, 255, 0.34)";
+  ctx.lineWidth = 1.5;
+  for (let i = 0; i < 3; i += 1) {
+    const radius = 34 + i * 20 + Math.sin(phase * 3 + i) * 2;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, radius, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  ctx.restore();
+}
+
 function render() {
   drawBackground();
   drawWorldSurfaces();
   drawNpcs();
   drawTrail();
+  drawTimeFreezeField();
   drawAimGuide();
   drawReformPulse();
   drawPlayer();
@@ -518,6 +544,20 @@ function updateHud() {
     return;
   }
 
+  if (state.mode === "airAiming") {
+    statusNode.textContent =
+      "TIME FROZEN · REDIRECT · POWER " +
+      Math.round(state.launch.power * 100) +
+      "% · HITS " +
+      state.score.npcHits +
+      " · " +
+      progressMetres +
+      "m";
+    hintNode.textContent =
+      "Time is frozen. Drag a new direction and release to redirect the orb.";
+    return;
+  }
+
   if (state.mode === "orb") {
     statusNode.textContent =
       "ENERGY FORM · BURST " +
@@ -528,7 +568,7 @@ function updateHud() {
       progressMetres +
       "m";
     hintNode.textContent =
-      "Sides and undersides bounce the orb. Land on top of a floor or platform to reform.";
+      "Tap and hold mid-air to freeze time and re-aim. Sides and undersides still bounce.";
     return;
   }
 
@@ -563,7 +603,12 @@ function frame(now) {
   stepGame(state, reduceMotion ? Math.min(dt, 1 / 30) : dt);
   recordTrail();
 
-  if (state.mode !== "orb" && state.animation.reformPulse <= 0.15 && trail.length > 0) {
+  if (
+    state.mode !== "orb" &&
+    state.mode !== "airAiming" &&
+    state.animation.reformPulse <= 0.15 &&
+    trail.length > 0
+  ) {
     trail.shift();
   }
 
@@ -581,7 +626,7 @@ function pointerPosition(event) {
 }
 
 canvas.addEventListener("pointerdown", (event) => {
-  if (state.mode !== "ready") return;
+  if (state.mode !== "ready" && state.mode !== "orb") return;
 
   event.preventDefault();
   const point = pointerPosition(event);
