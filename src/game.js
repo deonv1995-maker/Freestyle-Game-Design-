@@ -1,15 +1,18 @@
 import {
   GAME_CONFIG,
   NPC_CONFIG,
-  beginAim,
+  beginSlingshot,
+  beginSteering,
+  cancelSlingshot,
   createGameState,
-  getAimVector,
-  getPlayerHandPosition,
+  endSteering,
+  getLaunchVector,
   getWorldNpcs,
   getWorldSurfaces,
-  releaseAim,
+  releaseSlingshot,
   stepGame,
-  updateAim
+  updateSlingshot,
+  updateSteering
 } from "./game-core.js";
 
 const canvas = document.querySelector("#gameCanvas");
@@ -259,9 +262,17 @@ function drawTrail() {
   for (let i = 1; i < trail.length; i += 1) {
     const a = worldToScreen(trail[i - 1].x, trail[i - 1].y);
     const b = worldToScreen(trail[i].x, trail[i].y);
-    const alpha = (i / trail.length) * 0.34;
-    ctx.strokeStyle = `rgba(255, 213, 106, ${alpha})`;
-    ctx.lineWidth = 1 + (i / trail.length) * 2;
+    const age = i / trail.length;
+
+    ctx.strokeStyle = `rgba(68, 178, 255, ${age * 0.24})`;
+    ctx.lineWidth = 8 * age + 1;
+    ctx.beginPath();
+    ctx.moveTo(a.x, a.y);
+    ctx.lineTo(b.x, b.y);
+    ctx.stroke();
+
+    ctx.strokeStyle = `rgba(181, 233, 255, ${age * 0.58})`;
+    ctx.lineWidth = 2.2 * age + 0.6;
     ctx.beginPath();
     ctx.moveTo(a.x, a.y);
     ctx.lineTo(b.x, b.y);
@@ -271,233 +282,170 @@ function drawTrail() {
   ctx.restore();
 }
 
-function drawAimGuide() {
-  if (state.mode !== "aiming") return;
-
-  const hand = getPlayerHandPosition(state);
-  const origin = worldToScreen(hand.x, hand.y);
-  const aim = getAimVector(state);
-  const guideLength = 90 + aim.power * 100;
-  const endX = origin.x + aim.x * guideLength;
-  const endY = origin.y + aim.y * guideLength;
-  const airborne = state.animation.airborneAim;
-  const guideColor = airborne
-    ? "rgba(121, 209, 255, 0.86)"
-    : "rgba(255, 213, 106, 0.72)";
-  const solidGuideColor = airborne
-    ? "rgba(156, 224, 255, 0.98)"
-    : "rgba(255, 213, 106, 0.95)";
+function drawControlZones() {
+  const middle = viewportWidth * 0.5;
 
   ctx.save();
-  ctx.setLineDash(airborne ? [5, 8] : [8, 7]);
-  ctx.strokeStyle = guideColor;
-  ctx.lineWidth = airborne ? 2.5 : 2;
+  ctx.fillStyle =
+    state.mode === "charging"
+      ? "rgba(45, 156, 255, 0.075)"
+      : "rgba(45, 156, 255, 0.025)";
+  ctx.fillRect(0, 0, middle, viewportHeight);
+
+  ctx.fillStyle =
+    state.mode === "orb"
+      ? "rgba(88, 198, 255, 0.055)"
+      : "rgba(88, 198, 255, 0.015)";
+  ctx.fillRect(middle, 0, viewportWidth - middle, viewportHeight);
+
+  ctx.strokeStyle = "rgba(145, 215, 255, 0.08)";
+  ctx.lineWidth = 1;
   ctx.beginPath();
-  ctx.moveTo(origin.x, origin.y);
+  ctx.moveTo(middle, viewportHeight * 0.68);
+  ctx.lineTo(middle, viewportHeight - 18);
+  ctx.stroke();
+
+  ctx.font = "600 10px ui-monospace, monospace";
+  ctx.textBaseline = "bottom";
+
+  ctx.fillStyle =
+    state.mode === "ready" || state.mode === "charging"
+      ? "rgba(170, 226, 255, 0.58)"
+      : "rgba(170, 226, 255, 0.2)";
+  ctx.fillText("LEFT · PULL BACK + RELEASE", 18, viewportHeight - 18);
+
+  const rightLabel = state.mode === "orb" ? "RIGHT · HOLD + DRAG TO STEER" : "RIGHT · STEER IN ORB FORM";
+  const width = ctx.measureText(rightLabel).width;
+  ctx.fillStyle =
+    state.mode === "orb"
+      ? "rgba(170, 226, 255, 0.62)"
+      : "rgba(170, 226, 255, 0.2)";
+  ctx.fillText(rightLabel, viewportWidth - width - 18, viewportHeight - 18);
+
+  ctx.restore();
+}
+
+function drawSlingshotGuide() {
+  if (state.mode !== "charging") return;
+
+  const aim = getLaunchVector(state);
+  const player = worldToScreen(state.player.x, state.player.y - 28);
+  const anchorX = state.launch.startX;
+  const anchorY = state.launch.startY;
+  const pullX = state.launch.currentX;
+  const pullY = state.launch.currentY;
+  const guideLength = 100 + aim.power * 150;
+  const endX = player.x + aim.x * guideLength;
+  const endY = player.y + aim.y * guideLength;
+
+  ctx.save();
+
+  ctx.strokeStyle = "rgba(81, 188, 255, 0.42)";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(anchorX - 10, anchorY - 8);
+  ctx.lineTo(pullX, pullY);
+  ctx.moveTo(anchorX + 10, anchorY + 8);
+  ctx.lineTo(pullX, pullY);
+  ctx.stroke();
+
+  ctx.fillStyle = "rgba(168, 229, 255, 0.9)";
+  ctx.beginPath();
+  ctx.arc(pullX, pullY, 7, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.setLineDash([8, 7]);
+  ctx.strokeStyle = "rgba(105, 207, 255, 0.8)";
+  ctx.lineWidth = 2.2;
+  ctx.beginPath();
+  ctx.moveTo(player.x, player.y);
   ctx.lineTo(endX, endY);
   ctx.stroke();
   ctx.setLineDash([]);
 
-  ctx.fillStyle = solidGuideColor;
+  ctx.strokeStyle = "rgba(188, 236, 255, 0.9)";
   ctx.beginPath();
-  ctx.arc(endX, endY, 4 + aim.power * 3, 0, Math.PI * 2);
-  ctx.fill();
+  ctx.arc(endX, endY, 10 + aim.power * 4, 0, Math.PI * 2);
+  ctx.stroke();
 
-  if (airborne) {
-    ctx.strokeStyle = "rgba(156, 224, 255, 0.66)";
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.arc(endX, endY, 13, 0, Math.PI * 2);
-    ctx.moveTo(endX - 19, endY);
-    ctx.lineTo(endX - 8, endY);
-    ctx.moveTo(endX + 8, endY);
-    ctx.lineTo(endX + 19, endY);
-    ctx.moveTo(endX, endY - 19);
-    ctx.lineTo(endX, endY - 8);
-    ctx.moveTo(endX, endY + 8);
-    ctx.lineTo(endX, endY + 19);
-    ctx.stroke();
+  const barWidth = 112;
+  const barX = anchorX - barWidth * 0.5;
+  const barY = anchorY + 34;
+  ctx.fillStyle = "rgba(255,255,255,0.1)";
+  roundRect(ctx, barX, barY, barWidth, 7, 4);
+  ctx.fill();
+  if (aim.power > 0) {
+    ctx.fillStyle = "rgba(86, 194, 255, 0.92)";
+    roundRect(ctx, barX, barY, barWidth * aim.power, 7, 4);
+    ctx.fill();
   }
 
-  const barWidth = 90;
-  const barX = origin.x - barWidth * 0.5;
-  const barY = origin.y + 48;
-  ctx.fillStyle = "rgba(255,255,255,0.11)";
-  roundRect(ctx, barX, barY, barWidth, 6, 3);
+  ctx.restore();
+}
+
+function drawSteeringGuide() {
+  if (state.mode !== "orb" || state.steering.pointerId === null) return;
+
+  const radius = 52;
+  const knobDistance = radius * state.steering.strength;
+  const knobX = state.steering.startX + state.steering.x * knobDistance;
+  const knobY = state.steering.startY + state.steering.y * knobDistance;
+
+  ctx.save();
+  ctx.strokeStyle = "rgba(118, 214, 255, 0.38)";
+  ctx.fillStyle = "rgba(68, 178, 255, 0.08)";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(state.steering.startX, state.steering.startY, radius, 0, Math.PI * 2);
   ctx.fill();
-  ctx.fillStyle = airborne
-    ? "rgba(121,209,255,0.92)"
-    : "rgba(255,213,106,0.9)";
-  roundRect(ctx, barX, barY, barWidth * aim.power, 6, 3);
+  ctx.stroke();
+
+  ctx.fillStyle = "rgba(167, 232, 255, 0.72)";
+  ctx.beginPath();
+  ctx.arc(knobX, knobY, 13, 0, Math.PI * 2);
   ctx.fill();
   ctx.restore();
 }
 
-function drawTeleportPulse() {
-  if (state.teleportPulse <= 0) return;
+function drawReformPulse() {
+  if (state.animation.reformPulse <= 0) return;
 
   const p = worldToScreen(state.player.x, state.player.y - 28);
-  const progress = 1 - state.teleportPulse;
-  const radius = (24 + progress * 48) * GAME_CONFIG.cameraZoom;
+  const progress = 1 - state.animation.reformPulse;
+  const radius = 18 + progress * 54;
 
   ctx.save();
-  ctx.strokeStyle = `rgba(121, 209, 255, ${state.teleportPulse * 0.75})`;
+  ctx.strokeStyle = `rgba(78, 190, 255, ${state.animation.reformPulse * 0.72})`;
   ctx.lineWidth = 3;
   ctx.beginPath();
-  ctx.arc(p.x, p.y, radius, 0, Math.PI * 2);
+  ctx.arc(p.x, p.y, radius * GAME_CONFIG.cameraZoom, 0, Math.PI * 2);
   ctx.stroke();
   ctx.restore();
 }
 
-function drawSlowMotionEffect() {
-  if (!state.animation.airborneAim) return;
-
-  const focus = worldToScreen(state.player.x, state.player.y - 34);
-  const phase = reduceMotion ? 0.45 : state.animation.airborneAimClock;
-
-  ctx.save();
-
-  ctx.fillStyle = "rgba(5, 11, 24, 0.2)";
-  ctx.fillRect(0, 0, viewportWidth, viewportHeight);
-
-  const vignette = ctx.createRadialGradient(
-    focus.x,
-    focus.y,
-    24,
-    focus.x,
-    focus.y,
-    Math.max(180, Math.min(viewportWidth, viewportHeight) * 0.72)
-  );
-  vignette.addColorStop(0, "rgba(121, 209, 255, 0.03)");
-  vignette.addColorStop(0.42, "rgba(54, 116, 170, 0.06)");
-  vignette.addColorStop(1, "rgba(2, 7, 17, 0.24)");
-  ctx.fillStyle = vignette;
-  ctx.fillRect(0, 0, viewportWidth, viewportHeight);
-
-  ctx.strokeStyle = "rgba(121, 209, 255, 0.15)";
-  ctx.lineWidth = 1.5;
-  for (let i = 0; i < 3; i += 1) {
-    const radius = 54 + i * 30 + mod(phase * 22, 24);
-    ctx.beginPath();
-    ctx.arc(focus.x, focus.y, radius, 0, Math.PI * 2);
-    ctx.stroke();
-  }
-
-  for (let i = 0; i < 8; i += 1) {
-    const angle = (Math.PI * 2 * i) / 8 + phase * 0.32;
-    const inner = 72 + (i % 2) * 9;
-    const outer = inner + 26;
-    ctx.beginPath();
-    ctx.moveTo(focus.x + Math.cos(angle) * inner, focus.y + Math.sin(angle) * inner);
-    ctx.lineTo(focus.x + Math.cos(angle) * outer, focus.y + Math.sin(angle) * outer);
-    ctx.stroke();
-  }
-
-  ctx.restore();
-}
-
 function drawPlayer() {
+  if (state.mode === "orb") return;
+
   const p = worldToScreen(state.player.x, state.player.y);
   const scale = GAME_CONFIG.cameraZoom;
-  const isAiming = state.mode === "aiming";
-  const isAirAim = state.animation.airborneAim;
-  const isAirborne = state.animation.playerAirborne;
-  const followThrough = state.animation.throwFollowThrough;
-  const throwProgress = followThrough > 0 ? 1 - followThrough : 1;
-  const throwSwing = followThrough > 0 ? Math.sin(throwProgress * Math.PI) : 0;
-  const aim = getAimVector(state);
-  const direction = isAiming
-    ? aim
-    : {
-        x: state.animation.throwDirectionX,
-        y: state.animation.throwDirectionY
-      };
-  const facing = direction.x < -0.05 ? -1 : 1;
-  const motionClock = isAirAim
-    ? state.animation.airborneAimClock
-    : state.animation.clock;
-  const floatOffset =
-    isAirborne && !reduceMotion ? Math.sin(motionClock * 3.2) * 2.2 : 0;
-  const recoil = followThrough > 0 ? throwSwing * 3.5 : 0;
-  const bodyLean = isAiming
-    ? Math.max(-4, Math.min(4, direction.x * 3.4))
-    : direction.x * throwSwing * 5;
-
-  const neck = { x: bodyLean * 0.5, y: -42 };
-  const hip = { x: -bodyLean * 0.18, y: -17 };
-  const shoulder = { x: neck.x + facing * 2, y: -36 };
-
-  let throwElbow;
-  let throwHand;
-
-  if (isAiming) {
-    throwElbow = {
-      x: shoulder.x - facing * 10 - direction.y * 4,
-      y: shoulder.y + 5 - direction.x * 3
-    };
-    throwHand = { x: 0, y: -34 };
-  } else if (followThrough > 0) {
-    const armLength = 22 + throwSwing * 9;
-    throwHand = {
-      x: shoulder.x + direction.x * armLength,
-      y: shoulder.y + direction.y * armLength
-    };
-    throwElbow = {
-      x: shoulder.x + direction.x * armLength * 0.48 - direction.y * 4,
-      y: shoulder.y + direction.y * armLength * 0.48 + direction.x * 4
-    };
-  } else {
-    throwElbow = { x: facing * 7, y: -31 };
-    throwHand = { x: facing * 12, y: -39 };
-  }
-
-  const offShoulder = { x: neck.x - facing * 2, y: -35 };
-  const offElbow = isAirAim
-    ? { x: -facing * 11, y: -28 }
-    : { x: -facing * 9 - direction.x * throwSwing * 4, y: -28 };
-  const offHand = isAirAim
-    ? { x: -facing * 16, y: -18 }
-    : { x: -facing * 14 - direction.x * throwSwing * 7, y: -22 };
-
-  let legA;
-  let legB;
-
-  if (isAirborne) {
-    const curl = reduceMotion ? 0.45 : (Math.sin(motionClock * 4) + 1) * 0.5;
-    legA = {
-      knee: { x: -facing * 9, y: -7 - curl * 4 },
-      foot: { x: -facing * 3, y: 1 - curl * 2 }
-    };
-    legB = {
-      knee: { x: facing * 9, y: -9 + curl * 3 },
-      foot: { x: facing * 16, y: -2 + curl * 2 }
-    };
-  } else {
-    const stride = throwSwing * 4;
-    legA = {
-      knee: { x: -facing * 6, y: -8 },
-      foot: { x: -facing * (11 + stride), y: 0 }
-    };
-    legB = {
-      knee: { x: facing * 7, y: -7 },
-      foot: { x: facing * (11 + stride), y: 0 }
-    };
-  }
+  const charging = state.mode === "charging";
+  const aim = getLaunchVector(state);
+  const facing = aim.x < -0.05 ? -1 : 1;
+  const lean = charging ? -aim.x * 3.5 * state.launch.power : 0;
 
   ctx.save();
   ctx.translate(p.x, p.y);
   ctx.scale(scale, scale);
-  ctx.translate(
-    -direction.x * recoil,
-    floatOffset - direction.y * recoil * 0.35
-  );
 
-  if (followThrough > 0) {
-    ctx.strokeStyle = `rgba(255, 213, 106, ${0.18 + throwSwing * 0.22})`;
+  if (charging) {
+    const aura = 18 + state.launch.power * 18;
+    ctx.strokeStyle = `rgba(70, 187, 255, ${0.22 + state.launch.power * 0.45})`;
     ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.arc(shoulder.x, shoulder.y, 25 + throwSwing * 7, -1.9, 0.45);
-    ctx.stroke();
+    for (let i = 0; i < 3; i += 1) {
+      ctx.beginPath();
+      ctx.arc(0, -29, aura + i * 7, 0, Math.PI * 2);
+      ctx.stroke();
+    }
   }
 
   ctx.strokeStyle = "#eef3ff";
@@ -507,72 +455,98 @@ function drawPlayer() {
   ctx.lineJoin = "round";
 
   ctx.beginPath();
-  ctx.arc(neck.x + bodyLean * 0.18, -51, 8, 0, Math.PI * 2);
+  ctx.arc(lean * 0.25, -51, 8, 0, Math.PI * 2);
   ctx.fill();
 
   ctx.beginPath();
-  ctx.moveTo(neck.x, neck.y);
-  ctx.lineTo(hip.x, hip.y);
+  ctx.moveTo(lean * 0.15, -42);
+  ctx.lineTo(-lean * 0.12, -18);
 
-  ctx.moveTo(shoulder.x, shoulder.y);
-  ctx.lineTo(throwElbow.x, throwElbow.y);
-  ctx.lineTo(throwHand.x, throwHand.y);
+  if (charging) {
+    ctx.moveTo(lean * 0.05, -36);
+    ctx.lineTo(-facing * 9, -29);
+    ctx.lineTo(-facing * 15, -20);
+    ctx.moveTo(lean * 0.05, -36);
+    ctx.lineTo(facing * 10, -30);
+    ctx.lineTo(facing * 16, -22);
+  } else {
+    ctx.moveTo(0, -35);
+    ctx.lineTo(-10, -27);
+    ctx.moveTo(0, -35);
+    ctx.lineTo(10, -27);
+  }
 
-  ctx.moveTo(offShoulder.x, offShoulder.y);
-  ctx.lineTo(offElbow.x, offElbow.y);
-  ctx.lineTo(offHand.x, offHand.y);
-
-  ctx.moveTo(hip.x, hip.y);
-  ctx.lineTo(legA.knee.x, legA.knee.y);
-  ctx.lineTo(legA.foot.x, legA.foot.y);
-
-  ctx.moveTo(hip.x, hip.y);
-  ctx.lineTo(legB.knee.x, legB.knee.y);
-  ctx.lineTo(legB.foot.x, legB.foot.y);
+  ctx.moveTo(-lean * 0.12, -18);
+  ctx.lineTo(-9, 0);
+  ctx.moveTo(-lean * 0.12, -18);
+  ctx.lineTo(9, 0);
   ctx.stroke();
 
-  if (isAirAim) {
-    ctx.fillStyle = "rgba(121, 209, 255, 0.9)";
+  if (charging) {
+    ctx.fillStyle = "rgba(116, 211, 255, 0.9)";
     ctx.beginPath();
-    ctx.arc(throwHand.x, throwHand.y, 3.2, 0, Math.PI * 2);
+    ctx.arc(0, -31, 3 + state.launch.power * 4, 0, Math.PI * 2);
     ctx.fill();
   }
 
   ctx.restore();
 }
 
-function drawSpear() {
-  const p = worldToScreen(state.spear.x, state.spear.y);
+function drawOrb() {
+  if (state.mode !== "orb" || !state.orb.active) return;
+
+  const p = worldToScreen(state.orb.x, state.orb.y);
+  const scale = GAME_CONFIG.cameraZoom;
+  const radius = GAME_CONFIG.orbRadius * scale;
+  const phase = state.animation.clock;
+  const pulse = 1 + Math.sin(phase * 11) * 0.08;
 
   ctx.save();
-  ctx.translate(p.x, p.y);
-  ctx.scale(GAME_CONFIG.cameraZoom, GAME_CONFIG.cameraZoom);
-  ctx.rotate(state.spear.angle);
+  ctx.globalCompositeOperation = "lighter";
+  ctx.shadowColor = "rgba(72, 190, 255, 0.95)";
+  ctx.shadowBlur = 24;
 
-  ctx.strokeStyle = "#e8d5a1";
-  ctx.lineWidth = 5;
-  ctx.lineCap = "round";
+  const glow = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, radius * 2.6);
+  glow.addColorStop(0, "rgba(236, 251, 255, 1)");
+  glow.addColorStop(0.24, "rgba(126, 219, 255, 0.98)");
+  glow.addColorStop(0.52, "rgba(48, 153, 255, 0.72)");
+  glow.addColorStop(1, "rgba(34, 115, 255, 0)");
+  ctx.fillStyle = glow;
   ctx.beginPath();
-  ctx.moveTo(-30, 0);
-  ctx.lineTo(25, 0);
-  ctx.stroke();
-
-  ctx.fillStyle = "#d9e6ff";
-  ctx.beginPath();
-  ctx.moveTo(34, 0);
-  ctx.lineTo(22, -7);
-  ctx.lineTo(22, 7);
-  ctx.closePath();
+  ctx.arc(p.x, p.y, radius * 2.6 * pulse, 0, Math.PI * 2);
   ctx.fill();
 
-  ctx.fillStyle = "#b38b52";
-  ctx.fillRect(-32, -3, 8, 6);
+  ctx.fillStyle = "rgba(188, 239, 255, 0.98)";
+  ctx.beginPath();
+  ctx.arc(p.x, p.y, radius * pulse, 0, Math.PI * 2);
+  ctx.fill();
 
-  if (state.mode === "stuck") {
-    ctx.strokeStyle = "rgba(255, 213, 106, 0.8)";
+  ctx.strokeStyle = "rgba(207, 246, 255, 0.96)";
+  ctx.lineWidth = 1.5;
+  for (let i = 0; i < 6; i += 1) {
+    const angle = (Math.PI * 2 * i) / 6 + phase * (1.4 + i * 0.08);
+    const inner = radius * 0.8;
+    const mid = radius * (1.35 + 0.15 * Math.sin(phase * 13 + i));
+    const outer = radius * (1.9 + 0.18 * Math.sin(phase * 9 + i * 1.7));
+    ctx.beginPath();
+    ctx.moveTo(p.x + Math.cos(angle) * inner, p.y + Math.sin(angle) * inner);
+    ctx.lineTo(
+      p.x + Math.cos(angle + 0.19 * Math.sin(phase * 17 + i)) * mid,
+      p.y + Math.sin(angle + 0.19 * Math.sin(phase * 17 + i)) * mid
+    );
+    ctx.lineTo(
+      p.x + Math.cos(angle - 0.12) * outer,
+      p.y + Math.sin(angle - 0.12) * outer
+    );
+    ctx.stroke();
+  }
+
+  if (state.animation.transformPulse > 0) {
+    const transformRadius = radius * (1.7 + (1 - state.animation.transformPulse) * 3.5);
+    ctx.strokeStyle = `rgba(122, 219, 255, ${state.animation.transformPulse * 0.7})`;
     ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.arc(0, 0, 12, 0, Math.PI * 2);
+    ctx.arc(p.x, p.y, transformRadius, 0, Math.PI * 2);
     ctx.stroke();
   }
 
@@ -581,81 +555,77 @@ function drawSpear() {
 
 function render() {
   drawBackground();
+  drawControlZones();
   drawWorldSurfaces();
   drawNpcs();
   drawTrail();
-  drawSlowMotionEffect();
-  drawAimGuide();
-  drawTeleportPulse();
+  drawSlingshotGuide();
+  drawSteeringGuide();
+  drawReformPulse();
   drawPlayer();
-  drawSpear();
+  drawOrb();
 }
 
 function updateHud() {
   const progressMetres = Math.max(0, Math.round(state.world.maxProgressX / 10));
   const snapshot = [
     state.mode,
-    state.throwCount,
+    state.burstCount,
     state.score.npcHits,
     progressMetres,
-    state.animation.airborneAim ? 1 : 0
+    Math.round(state.launch.power * 100)
   ].join("|");
 
   if (snapshot === lastHudSnapshot) return;
   lastHudSnapshot = snapshot;
 
-  if (state.mode === "flying") {
+  if (state.mode === "charging") {
     statusNode.textContent =
-      "SPEAR IN FLIGHT · THROW " +
-      state.throwCount +
+      "POWER DRAW · " +
+      Math.round(state.launch.power * 100) +
+      "% · HITS " +
+      state.score.npcHits +
+      " · " +
+      progressMetres +
+      "m";
+    hintNode.textContent =
+      "Left side: pull back opposite the direction you want to launch, then release.";
+    return;
+  }
+
+  if (state.mode === "orb") {
+    statusNode.textContent =
+      "ENERGY FORM · BURST " +
+      state.burstCount +
       " · HITS " +
       state.score.npcHits +
       " · " +
       progressMetres +
       "m";
     hintNode.textContent =
-      "Press and hold to jump to the spear now, then slide to aim the next throw.";
+      "Right side: hold and drag like a joystick to bend the orb's flight.";
     return;
   }
 
-  if (state.mode === "stuck") {
-    statusNode.textContent =
-      "IMPACT RELAY · THROW " +
-      state.throwCount +
-      " · HITS " +
-      state.score.npcHits +
-      " · " +
-      progressMetres +
-      "m";
-    hintNode.textContent =
-      "You moved to the spear automatically. Hold and slide to aim the next throw.";
-    return;
-  }
-
-  if (state.mode === "aiming") {
-    if (state.animation.airborneAim) {
-      statusNode.textContent = "AIR AIM · HITS " + state.score.npcHits + " · SLOW MOTION";
-      hintNode.textContent =
-        "Hang time is slowed for aiming. Slide to line up the throw, then release.";
-    } else {
-      statusNode.textContent = "AIMING · HITS " + state.score.npcHits;
-      hintNode.textContent = "Slide in the throw direction. Release your finger to launch.";
-    }
-    return;
-  }
-
-  statusNode.textContent = "READY · HITS " + state.score.npcHits;
+  statusNode.textContent =
+    "READY · BURSTS " +
+    state.burstCount +
+    " · HITS " +
+    state.score.npcHits +
+    " · " +
+    progressMetres +
+    "m";
   hintNode.textContent =
-    "Move forward, hit roaming NPCs with the spear, and the course will keep generating ahead.";
+    "Left side: press and pull back like a slingshot. Release to transform and launch.";
 }
 
 function recordTrail() {
-  if (state.mode !== "flying") return;
+  if (state.mode !== "orb") return;
 
   const previous = trail.at(-1);
-  if (!previous || Math.hypot(state.spear.x - previous.x, state.spear.y - previous.y) > 11) {
-    trail.push({ x: state.spear.x, y: state.spear.y });
-    if (trail.length > 26) trail.shift();
+  if (!previous || Math.hypot(state.orb.x - previous.x, state.orb.y - previous.y) > 8) {
+    trail.push({ x: state.orb.x, y: state.orb.y });
+    if (trail.length > 34) trail.shift();
   }
 }
 
@@ -667,45 +637,87 @@ function frame(now) {
 
   stepGame(state, reduceMotion ? Math.min(dt, 1 / 30) : dt);
   recordTrail();
+
+  if (state.mode !== "orb" && state.animation.reformPulse <= 0.15 && trail.length > 0) {
+    trail.shift();
+  }
+
   updateHud();
   render();
   requestAnimationFrame(frame);
 }
 
+function pointerPosition(event) {
+  const rect = canvas.getBoundingClientRect();
+  return {
+    x: event.clientX - rect.left,
+    y: event.clientY - rect.top
+  };
+}
+
 canvas.addEventListener("pointerdown", (event) => {
   event.preventDefault();
-  canvas.setPointerCapture?.(event.pointerId);
+  const point = pointerPosition(event);
+  const leftSide = point.x < viewportWidth * 0.5;
+  let accepted = false;
 
-  const wasRelaying = state.mode === "flying" || state.mode === "stuck";
-  beginAim(state, event.clientX, event.clientY, event.pointerId);
-
-  if (wasRelaying) {
-    trail = [];
+  if (leftSide && state.mode === "ready") {
+    accepted = beginSlingshot(state, point.x, point.y, event.pointerId);
+  } else if (!leftSide && state.mode === "orb") {
+    accepted = beginSteering(state, point.x, point.y, event.pointerId);
   }
 
-  updateHud();
+  if (accepted) {
+    canvas.setPointerCapture?.(event.pointerId);
+    updateHud();
+  }
 });
 
 canvas.addEventListener("pointermove", (event) => {
-  if (state.mode !== "aiming") return;
-  event.preventDefault();
-  updateAim(state, event.clientX, event.clientY, event.pointerId);
+  const point = pointerPosition(event);
+
+  if (state.launch.pointerId === event.pointerId) {
+    event.preventDefault();
+    updateSlingshot(state, point.x, point.y, event.pointerId);
+    return;
+  }
+
+  if (state.steering.pointerId === event.pointerId) {
+    event.preventDefault();
+    updateSteering(state, point.x, point.y, event.pointerId);
+  }
 });
 
-function finishAim(event) {
-  if (state.mode !== "aiming") return;
-  event.preventDefault();
+canvas.addEventListener("pointerup", (event) => {
+  const wasLaunchPointer = state.launch.pointerId === event.pointerId;
+  const wasSteeringPointer = state.steering.pointerId === event.pointerId;
 
-  if (releaseAim(state, event.pointerId)) {
-    trail = [{ x: state.spear.x, y: state.spear.y }];
+  if (wasLaunchPointer) {
+    event.preventDefault();
+    if (releaseSlingshot(state, event.pointerId)) {
+      trail = [{ x: state.orb.x, y: state.orb.y }];
+    }
     updateHud();
+  } else if (wasSteeringPointer) {
+    event.preventDefault();
+    endSteering(state, event.pointerId);
   }
 
   canvas.releasePointerCapture?.(event.pointerId);
-}
+});
 
-canvas.addEventListener("pointerup", finishAim);
-canvas.addEventListener("pointercancel", finishAim);
+canvas.addEventListener("pointercancel", (event) => {
+  if (state.launch.pointerId === event.pointerId) {
+    cancelSlingshot(state, event.pointerId);
+    updateHud();
+  }
+
+  if (state.steering.pointerId === event.pointerId) {
+    endSteering(state, event.pointerId);
+  }
+
+  canvas.releasePointerCapture?.(event.pointerId);
+});
 
 resetButton.addEventListener("click", () => {
   state = createGameState();
