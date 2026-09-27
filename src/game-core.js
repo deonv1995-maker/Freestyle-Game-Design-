@@ -73,6 +73,11 @@ export const DRONE_CONFIG = Object.freeze({
   corridorPadding: 72
 });
 
+export const EFFECT_CONFIG = Object.freeze({
+  droneExplosionDuration: 0.55,
+  maxDroneExplosions: 12
+});
+
 const DEFAULT_LAUNCH = Object.freeze({
   dx: 0,
   dy: -150,
@@ -98,6 +103,15 @@ export const STARTER_SURFACES = Object.freeze([
     y: WORLD_CONFIG.proceduralStartY,
     width: WORLD_CONFIG.structuralThickness,
     height: WORLD_CONFIG.starterBottomY - WORLD_CONFIG.proceduralStartY
+  }),
+  Object.freeze({
+    id: "starter-bottom-wall",
+    type: "bottomWall",
+    visual: "corridorWall",
+    x: CORRIDOR_LEFT,
+    y: WORLD_CONFIG.starterBottomY,
+    width: CORRIDOR_RIGHT - CORRIDOR_LEFT,
+    height: WORLD_CONFIG.structuralThickness
   }),
   Object.freeze({
     id: "starter-moving-platform",
@@ -211,6 +225,9 @@ export function createGameState() {
       deathPulse: 0,
       checkpointPulse: 0,
       runResetPulse: 0
+    },
+    effects: {
+      droneExplosions: []
     },
     camera: { x: START_POSITION.x, y: START_POSITION.y },
     progress: {
@@ -402,6 +419,7 @@ export function stepGame(state, deltaSeconds) {
     0,
     state.orb.invulnerability - gameplayDt
   );
+  advanceTransientEffects(state, gameplayDt);
 
   refreshWorldForFocus(state, state.orb.y);
   updateDynamicWorld(state);
@@ -450,6 +468,10 @@ export function getWorldDrones(state) {
 
 export function getWorldProjectiles(state) {
   return state.world.projectiles;
+}
+
+export function getDroneExplosions(state) {
+  return state.effects.droneExplosions;
 }
 
 
@@ -950,7 +972,7 @@ function destroyDronesAlongSegment(
   endY,
   maxTime = 1
 ) {
-  const destroyedIds = [];
+  const destroyedDrones = [];
 
   for (const drone of state.world.drones) {
     const hit = segmentCircleIntersection(
@@ -964,21 +986,52 @@ function destroyDronesAlongSegment(
     );
 
     if (!hit || hit.t > maxTime + 1e-9) continue;
-    destroyedIds.push(drone.id);
+    destroyedDrones.push(drone);
   }
 
-  if (destroyedIds.length === 0) return 0;
+  if (destroyedDrones.length === 0) return 0;
 
+  const destroyedIds = destroyedDrones.map((drone) => drone.id);
   const destroyedSet = new Set(destroyedIds);
-  for (const id of destroyedIds) {
-    state.world.destroyedDroneIds.add(id);
+
+  for (const drone of destroyedDrones) {
+    state.world.destroyedDroneIds.add(drone.id);
+    queueDroneExplosion(state, drone);
   }
 
   state.world.drones = state.world.drones.filter(
     (drone) => !destroyedSet.has(drone.id)
   );
 
-  return destroyedIds.length;
+  return destroyedDrones.length;
+}
+
+function queueDroneExplosion(state, drone) {
+  state.effects.droneExplosions.push({
+    sourceId: drone.id,
+    x: drone.x,
+    y: drone.y,
+    age: 0,
+    duration: EFFECT_CONFIG.droneExplosionDuration,
+    phase: mod(state.world.clock * 2.7 + drone.x * 0.013 + drone.y * 0.009, Math.PI * 2)
+  });
+
+  if (state.effects.droneExplosions.length > EFFECT_CONFIG.maxDroneExplosions) {
+    state.effects.droneExplosions.splice(
+      0,
+      state.effects.droneExplosions.length - EFFECT_CONFIG.maxDroneExplosions
+    );
+  }
+}
+
+function advanceTransientEffects(state, dt) {
+  for (const explosion of state.effects.droneExplosions) {
+    explosion.age += dt;
+  }
+
+  state.effects.droneExplosions = state.effects.droneExplosions.filter(
+    (explosion) => explosion.age < explosion.duration
+  );
 }
 
 function findEarliestLethalCollision(state, startX, startY, endX, endY) {
