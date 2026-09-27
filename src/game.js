@@ -1,6 +1,7 @@
 import {
   DRONE_CONFIG,
   GAME_CONFIG,
+  WORLD_CONFIG,
   beginAim,
   cancelAim,
   createGameState,
@@ -56,7 +57,7 @@ function worldToScreen(x, y) {
   const scale = GAME_CONFIG.cameraZoom;
   return {
     x: (x - state.camera.x) * scale + viewportWidth * 0.5,
-    y: (y - state.camera.y) * scale + viewportHeight * 0.53
+    y: (y - state.camera.y) * scale + viewportHeight * 0.66
   };
 }
 
@@ -148,29 +149,30 @@ function drawWorldSurfaces() {
   }
 }
 
+
 function drawCorridorShell(p, width, height, scale, type) {
   ctx.save();
 
-  const roof = type === "ceiling";
-  const gradient = ctx.createLinearGradient(p.x, p.y, p.x, p.y + height);
-  gradient.addColorStop(0, roof ? "#263347" : "#1a2533");
-  gradient.addColorStop(1, roof ? "#121a27" : "#0e1621");
+  const leftWall = type === "leftWall";
+  const gradient = ctx.createLinearGradient(p.x, p.y, p.x + width, p.y);
+  gradient.addColorStop(0, leftWall ? "#121a27" : "#263347");
+  gradient.addColorStop(1, leftWall ? "#263347" : "#121a27");
 
   ctx.fillStyle = gradient;
   ctx.fillRect(p.x, p.y, width, height);
 
-  const edgeY = roof ? p.y + height - 5 * scale : p.y;
+  const edgeX = leftWall ? p.x + width - 5 * scale : p.x;
   ctx.fillStyle = "rgba(77, 215, 255, 0.5)";
-  ctx.fillRect(p.x, edgeY, width, Math.max(2, 4 * scale));
+  ctx.fillRect(edgeX, p.y, Math.max(2, 4 * scale), height);
 
   const panelStep = 112 * scale;
   ctx.strokeStyle = "rgba(155, 190, 216, 0.1)";
   ctx.lineWidth = 1;
 
-  for (let x = p.x + panelStep; x < p.x + width; x += panelStep) {
+  for (let y = p.y + panelStep; y < p.y + height; y += panelStep) {
     ctx.beginPath();
-    ctx.moveTo(x, p.y);
-    ctx.lineTo(x, p.y + height);
+    ctx.moveTo(p.x, y);
+    ctx.lineTo(p.x + width, y);
     ctx.stroke();
   }
 
@@ -209,15 +211,17 @@ function drawMovingPlatform(p, width, height, scale, motion) {
   ctx.restore();
 }
 
+
 function drawCheckpoints() {
   const scale = GAME_CONFIG.cameraZoom;
 
   for (const checkpoint of getWorldCheckpoints(state)) {
-    const x = worldToScreen(checkpoint.x, 0).x;
-    if (x < -80 || x > viewportWidth + 80) continue;
+    const y = worldToScreen(0, checkpoint.y).y;
+    if (y < -80 || y > viewportHeight + 80) continue;
 
-    const top = worldToScreen(checkpoint.x, -470).y;
-    const bottom = worldToScreen(checkpoint.x, 130).y;
+    const left = worldToScreen(WORLD_CONFIG.corridorLeft + 18, checkpoint.y).x;
+    const right = worldToScreen(WORLD_CONFIG.corridorRight - 18, checkpoint.y).x;
+    const center = (left + right) * 0.5;
     const active = checkpoint.index <= state.checkpoint.index;
 
     ctx.save();
@@ -227,8 +231,8 @@ function drawCheckpoints() {
     ctx.lineWidth = 2;
     ctx.setLineDash([7, 8]);
     ctx.beginPath();
-    ctx.moveTo(x, top);
-    ctx.lineTo(x, bottom);
+    ctx.moveTo(left, y);
+    ctx.lineTo(right, y);
     ctx.stroke();
     ctx.setLineDash([]);
 
@@ -237,7 +241,7 @@ function drawCheckpoints() {
       : "rgba(142, 218, 255, 0.78)";
     ctx.font = "700 11px ui-monospace, monospace";
     ctx.textAlign = "center";
-    ctx.fillText(`CP ${checkpoint.index}`, x, top - 10 * scale);
+    ctx.fillText(`CP ${checkpoint.index}`, center, y - 10 * scale);
     ctx.restore();
   }
 }
@@ -251,6 +255,7 @@ function drawHazards() {
     }
   }
 }
+
 
 function drawSpikes(hazard) {
   const scale = GAME_CONFIG.cameraZoom;
@@ -267,10 +272,10 @@ function drawSpikes(hazard) {
     return;
   }
 
-  const ceiling = hazard.type === "ceilingSpikes";
-  const spikeWidth = Math.max(12, 24 * scale);
-  const count = Math.max(1, Math.ceil(width / spikeWidth));
-  const actualWidth = width / count;
+  const left = hazard.type === "leftSpikes";
+  const spikeHeight = Math.max(12, 24 * scale);
+  const count = Math.max(1, Math.ceil(height / spikeHeight));
+  const actualHeight = height / count;
 
   ctx.save();
   ctx.fillStyle = "#c7d5e3";
@@ -278,17 +283,17 @@ function drawSpikes(hazard) {
   ctx.lineWidth = 1.2;
 
   for (let i = 0; i < count; i += 1) {
-    const left = p.x + i * actualWidth;
+    const top = p.y + i * actualHeight;
     ctx.beginPath();
 
-    if (ceiling) {
-      ctx.moveTo(left, p.y);
-      ctx.lineTo(left + actualWidth * 0.5, p.y + height);
-      ctx.lineTo(left + actualWidth, p.y);
+    if (left) {
+      ctx.moveTo(p.x, top);
+      ctx.lineTo(p.x + width, top + actualHeight * 0.5);
+      ctx.lineTo(p.x, top + actualHeight);
     } else {
-      ctx.moveTo(left, p.y + height);
-      ctx.lineTo(left + actualWidth * 0.5, p.y);
-      ctx.lineTo(left + actualWidth, p.y + height);
+      ctx.moveTo(p.x + width, top);
+      ctx.lineTo(p.x, top + actualHeight * 0.5);
+      ctx.lineTo(p.x + width, top + actualHeight);
     }
 
     ctx.closePath();
@@ -299,11 +304,12 @@ function drawSpikes(hazard) {
   ctx.restore();
 }
 
+
 function drawLaser(hazard) {
   const scale = GAME_CONFIG.cameraZoom;
   const p = worldToScreen(hazard.x, hazard.y);
-  const width = Math.max(3, hazard.width * scale);
-  const height = hazard.height * scale;
+  const width = hazard.width * scale;
+  const height = Math.max(3, hazard.height * scale);
 
   if (
     p.x > viewportWidth + 90 ||
@@ -321,11 +327,11 @@ function drawLaser(hazard) {
   ctx.strokeStyle = hazard.active ? "#ff7a87" : "#61778d";
   ctx.lineWidth = 2;
   ctx.beginPath();
-  ctx.arc(p.x + width * 0.5, p.y - 8 * scale, emitterRadius, 0, Math.PI * 2);
+  ctx.arc(p.x - 8 * scale, p.y + height * 0.5, emitterRadius, 0, Math.PI * 2);
   ctx.fill();
   ctx.stroke();
   ctx.beginPath();
-  ctx.arc(p.x + width * 0.5, p.y + height + 8 * scale, emitterRadius, 0, Math.PI * 2);
+  ctx.arc(p.x + width + 8 * scale, p.y + height * 0.5, emitterRadius, 0, Math.PI * 2);
   ctx.fill();
   ctx.stroke();
 
@@ -336,13 +342,13 @@ function drawLaser(hazard) {
     ctx.fillStyle = "rgba(255, 67, 91, 0.9)";
     ctx.fillRect(p.x, p.y, width, height);
     ctx.fillStyle = "rgba(255, 225, 230, 0.94)";
-    ctx.fillRect(p.x + width * 0.35, p.y, Math.max(1, width * 0.3), height);
+    ctx.fillRect(p.x, p.y + height * 0.35, width, Math.max(1, height * 0.3));
   } else {
     ctx.strokeStyle = "rgba(255, 102, 123, 0.18)";
     ctx.setLineDash([5, 9]);
     ctx.beginPath();
-    ctx.moveTo(p.x + width * 0.5, p.y);
-    ctx.lineTo(p.x + width * 0.5, p.y + height);
+    ctx.moveTo(p.x, p.y + height * 0.5);
+    ctx.lineTo(p.x + width, p.y + height * 0.5);
     ctx.stroke();
   }
 
@@ -677,13 +683,13 @@ function updateHud() {
   if (state.mode === "orb") {
     statusNode.textContent = `ENERGY FORM · ${runStats}`;
     hintNode.textContent =
-      "Keep bouncing. Tap and hold mid-air to freeze and redirect around lasers, spikes and drones.";
+      "Zero gravity: keep your momentum upward, then freeze and redirect around lasers, wall spikes and drones.";
     return;
   }
 
   statusNode.textContent = `ORB READY · ${runStats}`;
   hintNode.textContent =
-    "The orb stays transformed. Drag to launch; it will keep bouncing until its momentum fades.";
+    "Zero gravity. Drag upward to launch through the side-wall corridor; momentum changes only through redirects and impacts.";
 }
 
 function recordTrail() {
