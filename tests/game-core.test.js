@@ -133,7 +133,7 @@ test("falling spear sticks to the ground instead of passing through it", () => {
 
   assert.equal(state.mode, "stuck");
   assert.equal(state.spear.y, 180);
-  assert.equal(state.spear.contact.surfaceId, "ground");
+  assert.equal(state.spear.contact.surfaceId, "starter-ground");
   assert.equal(state.spear.vx, 0);
   assert.equal(state.spear.vy, 0);
 });
