@@ -18,7 +18,7 @@ export const GAME_CONFIG = Object.freeze({
   restSpeedThreshold: 105,
   cameraSharpness: 10,
   cameraZoom: 0.78,
-  touchTimeScale: 0.2,
+  touchTimeScale: 0.4,
   respawnInvulnerability: 0.9,
   startingLives: 7
 });
