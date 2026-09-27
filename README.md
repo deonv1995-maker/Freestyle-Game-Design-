@@ -4,7 +4,7 @@ An experimental game-design repository for rapidly turning ideas into playable p
 
 This project is intentionally open-ended. It may become one game, several experiments, or a place to test unusual mechanics before deciding what deserves deeper development.
 
-## Current playable slice — Energy Relay 0.9
+## Current playable slice — Energy Relay 0.10
 
 The current prototype is a mobile-first 2D traversal mechanic built around a character transformation power:
 
@@ -22,6 +22,8 @@ The current prototype is a mobile-first 2D traversal mechanic built around a cha
 - underside impacts against platforms rebound;
 - obstacle tops are non-standable and rebound the orb;
 - only a downward landing on the top of ground or a platform ends orb form and reforms the player;
+- the traversal course now reads as a futuristic vertical city: standable surfaces render as rooftops, landing pads and hover cars, while non-standable obstacles render as tall towers and spires;
+- tower heights are centralized in `CITY_CONFIG` and deliberately exceed the rise of a simple full-power 45-degree launch, making midair freeze/redirection useful for climbing and routing rather than letting the orb casually clear the skyline in one diagonal shot;
 - the procedural course and deterministic bounded NPC/world streaming remain the source of truth for endless traversal.
 
 The energy-orb visual treatment remains the same: blue core, glow, lightning arcs, transformation pulse and energy trail. Midair redirect adds only a subtle time-freeze field and aim guide around the frozen orb.
