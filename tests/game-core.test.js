@@ -113,6 +113,26 @@ test("cancelled aim returns the resting orb to ready", () => {
   assert.equal(state.orb.active, true);
 });
 
+test("the first launch touch slows gameplay immediately", () => {
+  const slow = createGameState();
+  const normal = createGameState();
+
+  slow.orb.invulnerability = 5;
+  normal.orb.invulnerability = 5;
+
+  assert.equal(beginAim(slow, 200, 500, 20), true);
+  assert.equal(slow.mode, "aiming");
+  assert.notEqual(slow.launch.pointerId, null);
+
+  stepGame(slow, 0.05);
+  stepGame(normal, 0.05);
+
+  assert.equal(slow.world.clock, 0.05 * GAME_CONFIG.touchTimeScale);
+  assert.equal(slow.animation.clock, 0.05 * GAME_CONFIG.touchTimeScale);
+  assert.equal(normal.world.clock, 0.05);
+  assert.equal(normal.animation.clock, 0.05);
+});
+
 test("pressing during orb flight slows gameplay instead of freezing it", () => {
   const slow = createGameState();
   const normal = createGameState();
@@ -134,11 +154,11 @@ test("pressing during orb flight slows gameplay instead of freezing it", () => {
 
   assert.equal(
     slow.world.clock,
-    0.05 * GAME_CONFIG.airAimTimeScale
+    0.05 * GAME_CONFIG.touchTimeScale
   );
   assert.equal(
     slow.animation.clock,
-    0.05 * GAME_CONFIG.airAimTimeScale
+    0.05 * GAME_CONFIG.touchTimeScale
   );
   assert.equal(normal.world.clock, 0.05);
   assert.equal(normal.animation.clock, 0.05);
@@ -153,10 +173,10 @@ test("pressing during orb flight slows gameplay instead of freezing it", () => {
   assert.ok(normalDx > slowDx);
   assert.ok(normalDy > slowDy);
   assert.ok(
-    Math.abs(slowDx / normalDx - GAME_CONFIG.airAimTimeScale) < 1e-9
+    Math.abs(slowDx / normalDx - GAME_CONFIG.touchTimeScale) < 1e-9
   );
   assert.ok(
-    Math.abs(slowDy / normalDy - GAME_CONFIG.airAimTimeScale) < 1e-9
+    Math.abs(slowDy / normalDy - GAME_CONFIG.touchTimeScale) < 1e-9
   );
   assert.equal(slow.orb.vx, normal.orb.vx);
   assert.equal(slow.orb.vy, normal.orb.vy);
@@ -269,6 +289,9 @@ test("wall-mounted lasers stay fixed, persist, and cycle their beam on and off",
   const startWidth = laser.width;
   const seenStates = new Set([laser.active]);
 
+  assert.equal(HAZARD_CONFIG.laserBaseCycle, 3.6);
+  assert.equal(HAZARD_CONFIG.laserMinimumCycle, 1.8);
+  assert.equal(laser.laser.cycle, HAZARD_CONFIG.laserBaseCycle);
   assert.equal(laser.motion, undefined);
   assert.ok(["left", "right"].includes(laser.laser.sourceSide));
   assert.equal(
@@ -577,8 +600,8 @@ test("camera remains zoomed out for mobile vertical traversal visibility", () =>
 
 test("configured space-corridor values remain physically valid", () => {
   assert.equal(GAME_CONFIG.orbGravity, 0);
-  assert.ok(GAME_CONFIG.airAimTimeScale > 0);
-  assert.ok(GAME_CONFIG.airAimTimeScale < 1);
+  assert.ok(GAME_CONFIG.touchTimeScale > 0);
+  assert.ok(GAME_CONFIG.touchTimeScale < 1);
   assert.ok(HAZARD_CONFIG.laserMinimumCycle > 0);
   assert.ok(HAZARD_CONFIG.laserMaxActiveRatio < 1);
   assert.ok(WORLD_CONFIG.corridorLeft < WORLD_CONFIG.corridorRight);
