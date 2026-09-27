@@ -323,8 +323,8 @@ test("wall-mounted lasers stay fixed, persist, and cycle their beam on and off",
   const startWidth = laser.width;
   const seenStates = new Set([laser.active]);
 
-  assert.equal(HAZARD_CONFIG.laserBaseCycle, 3.6);
-  assert.equal(HAZARD_CONFIG.laserMinimumCycle, 1.8);
+  assert.equal(HAZARD_CONFIG.laserBaseCycle, 7.2);
+  assert.equal(HAZARD_CONFIG.laserMinimumCycle, 3.6);
   assert.equal(laser.laser.cycle, HAZARD_CONFIG.laserBaseCycle);
   assert.equal(laser.motion, undefined);
   assert.ok(["left", "right"].includes(laser.laser.sourceSide));
