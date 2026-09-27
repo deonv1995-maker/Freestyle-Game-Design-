@@ -627,6 +627,47 @@ test("drones are deterministic, slower than the orb and scale with difficulty", 
   );
 });
 
+test("drones give a full warning window before firing after acquiring the orb", () => {
+  const state = createGameState();
+  const drone = getWorldDrones(state)[0];
+
+  state.mode = "ready";
+  state.orb.invulnerability = 5;
+
+  drone.cooldown = 0.05;
+  state.orb.x = drone.x;
+  state.orb.y = drone.y + DRONE_CONFIG.acquireRange + 120;
+
+  stepGame(state, 0.05);
+
+  assert.equal(getWorldProjectiles(state).length, 0);
+  assert.equal(drone.fireWarning, false);
+  assert.equal(
+    drone.cooldown,
+    DRONE_CONFIG.preFireWarningDuration
+  );
+
+  state.orb.y = drone.y + 180;
+
+  stepGame(state, 0.05);
+
+  assert.equal(drone.fireWarning, true);
+  assert.ok(drone.fireWarningProgress > 0);
+  assert.equal(getWorldProjectiles(state).length, 0);
+
+  let sawWarning = drone.fireWarning;
+
+  for (let i = 0; i < 20 && getWorldProjectiles(state).length === 0; i += 1) {
+    stepGame(state, 0.05);
+    sawWarning ||= drone.fireWarning;
+  }
+
+  assert.equal(sawWarning, true);
+  assert.ok(getWorldProjectiles(state).length > 0);
+  assert.equal(drone.fireWarning, false);
+  assert.equal(drone.fireWarningProgress, 0);
+});
+
 test("nearby drones eventually fire targeted projectiles", () => {
   const state = createGameState();
   const drone = getWorldDrones(state)[0];
@@ -773,6 +814,11 @@ test("configured space-corridor values remain physically valid", () => {
       HAZARD_CONFIG.laserMinimumCycle * HAZARD_CONFIG.laserBaseActiveRatio
   );
   assert.ok(HAZARD_CONFIG.laserMaxActiveRatio < 1);
+  assert.ok(DRONE_CONFIG.preFireWarningDuration > 0);
+  assert.ok(
+    DRONE_CONFIG.preFireWarningDuration <
+      DRONE_CONFIG.baseFireInterval
+  );
   assert.ok(WORLD_CONFIG.corridorLeft < WORLD_CONFIG.corridorRight);
   assert.ok(WORLD_CONFIG.chunkHeight > 0);
 });

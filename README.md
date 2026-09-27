@@ -4,7 +4,7 @@ An experimental game-design repository for rapidly turning ideas into playable p
 
 This project is intentionally open-ended. It may become one game, several experiments, or a place to test unusual mechanics before deciding what deserves deeper development.
 
-## Current playable slice — Energy Relay 0.18
+## Current playable slice — Energy Relay 0.19
 
 - The player remains permanently in the blue energy-orb state; there is no human reform state.
 - Movement is now true zero-gravity/inertial motion: the orb has no constant downward acceleration. It keeps its current velocity until a redirect, collision or damping event changes it.
@@ -14,7 +14,7 @@ This project is intentionally open-ended. It may become one game, several experi
 - Environmental spike hazards have been removed. Persistent wall-mounted laser emitters keep the slower on/off cadence, each active beam travels across the corridor over 1.8 seconds, and the beam visibly flickers during its final 0.7 seconds before shutting off.
 - The orb has seven lives. A lethal hit respawns at the latest checkpoint with short invulnerability; losing the seventh life automatically starts a fresh run.
 - Checkpoints, difficulty, procedural streaming and distance records all use upward vertical progress as their single source of truth.
-- Targeting drones pursue within their active vertical chunk and fire projectiles. Direct orb contact destroys the drone without costing a life and now produces a short visible explosion; fired projectiles remain lethal.
+- Targeting drones pursue within their active vertical chunk and telegraph every shot with a 0.6-second pre-fire charge indicator before launching a projectile. Direct orb contact destroys the drone without costing a life and produces a short visible explosion; fired projectiles remain lethal.
 - Procedural chunks, hazards, checkpoints and drones remain deterministic and bounded for mobile-friendly runtime behavior.
 
 ## Technical foundation

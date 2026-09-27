@@ -404,6 +404,46 @@ function drawDronesAndProjectiles() {
     ctx.arc(0, 0, radius * 1.65, angle, angle + Math.PI * 1.2);
     ctx.stroke();
 
+    if (drone.fireWarning) {
+      const warningProgress = Math.min(
+        1,
+        Math.max(0, drone.fireWarningProgress ?? 0)
+      );
+      const pulse =
+        0.72 + Math.sin(state.animation.clock * 28) * 0.18;
+      const warningRadius =
+        radius * (2.35 - warningProgress * 0.38);
+
+      ctx.shadowColor = "rgba(255, 196, 84, 0.95)";
+      ctx.shadowBlur = 14 * pulse;
+      ctx.strokeStyle = `rgba(255, 205, 92, ${0.55 + warningProgress * 0.4})`;
+      ctx.lineWidth = Math.max(2, 3 * scale);
+      ctx.beginPath();
+      ctx.arc(
+        0,
+        0,
+        warningRadius,
+        -Math.PI * 0.5,
+        -Math.PI * 0.5 + Math.PI * 2 * warningProgress
+      );
+      ctx.stroke();
+
+      ctx.fillStyle = `rgba(255, 227, 139, ${pulse})`;
+      ctx.beginPath();
+      ctx.arc(0, 0, radius * (0.18 + warningProgress * 0.12), 0, Math.PI * 2);
+      ctx.fill();
+
+      const markerY = -radius * 2.9;
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = `rgba(255, 221, 112, ${0.72 + warningProgress * 0.28})`;
+      ctx.beginPath();
+      ctx.moveTo(0, markerY - 5 * scale);
+      ctx.lineTo(5 * scale, markerY + 4 * scale);
+      ctx.lineTo(-5 * scale, markerY + 4 * scale);
+      ctx.closePath();
+      ctx.fill();
+    }
+
     ctx.restore();
   }
 
@@ -769,7 +809,7 @@ function updateHud() {
   if (state.mode === "orb") {
     statusNode.textContent = `ENERGY FORM · ${runStats}`;
     hintNode.textContent =
-      "Zero gravity: every touch slows time, giving you a window to redirect around flickering lasers and drones.";
+      "Zero gravity: every touch slows time—read laser flicker and drone charge rings before committing.";
     return;
   }
 

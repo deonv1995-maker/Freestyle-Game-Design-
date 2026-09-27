@@ -65,6 +65,7 @@ export const DRONE_CONFIG = Object.freeze({
   acquireRange: 760,
   baseFireInterval: 1.9,
   minFireInterval: 0.78,
+  preFireWarningDuration: 0.6,
   projectileRadius: 6,
   projectileBaseSpeed: 430,
   projectileMaxSpeed: 680,
@@ -1096,9 +1097,33 @@ function updateDrones(state, dt) {
     const dx = orb.x - drone.x;
     const dy = orb.y - drone.y;
     const distance = Math.hypot(dx, dy);
-    drone.cooldown -= dt;
+    const targetInRange =
+      distance <= DRONE_CONFIG.acquireRange && distance > 1;
+    const projectileCapacityAvailable =
+      state.world.projectiles.length < DRONE_CONFIG.maxProjectiles;
 
-    if (distance <= DRONE_CONFIG.acquireRange && distance > 1) {
+    drone.cooldown = Math.max(0, drone.cooldown - dt);
+
+    if (!targetInRange || !projectileCapacityAvailable) {
+      drone.cooldown = Math.max(
+        drone.cooldown,
+        DRONE_CONFIG.preFireWarningDuration
+      );
+    }
+
+    drone.fireWarning =
+      targetInRange &&
+      projectileCapacityAvailable &&
+      drone.cooldown <= DRONE_CONFIG.preFireWarningDuration;
+    drone.fireWarningProgress = drone.fireWarning
+      ? clamp(
+          1 - drone.cooldown / DRONE_CONFIG.preFireWarningDuration,
+          0,
+          1
+        )
+      : 0;
+
+    if (targetInRange) {
       const desiredX = (dx / distance) * drone.speed;
       const desiredY = (dy / distance) * drone.speed;
       const pursuitScale = 0.72;
@@ -1133,11 +1158,13 @@ function updateDrones(state, dt) {
 
     if (
       drone.cooldown <= 0 &&
-      distance <= DRONE_CONFIG.acquireRange &&
-      state.world.projectiles.length < DRONE_CONFIG.maxProjectiles
+      targetInRange &&
+      projectileCapacityAvailable
     ) {
       fireDroneProjectile(state, drone, dx, dy, distance);
       drone.cooldown = drone.fireInterval;
+      drone.fireWarning = false;
+      drone.fireWarningProgress = 0;
     }
   }
 }
@@ -1251,7 +1278,9 @@ function reconcileActiveDrones(existingDrones, definitions) {
       ...definition,
       x: existing.x,
       y: existing.y,
-      cooldown: existing.cooldown
+      cooldown: existing.cooldown,
+      fireWarning: existing.fireWarning ?? false,
+      fireWarningProgress: existing.fireWarningProgress ?? 0
     };
   });
 }
