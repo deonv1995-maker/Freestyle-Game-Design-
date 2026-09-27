@@ -248,6 +248,7 @@ export function createGameState() {
       hazards: [],
       checkpoints: [],
       drones: [],
+      destroyedDroneIds: new Set(),
       projectiles: [],
       projectileSerial: 0
     }
@@ -463,12 +464,23 @@ export function refreshWorldForFocus(state, focusX) {
     droneDefinitions.push(...generateDroneChunk(chunkIndex));
   }
 
+  const activeDroneDefinitionIds = new Set(droneDefinitions.map((drone) => drone.id));
+  for (const destroyedId of state.world.destroyedDroneIds) {
+    if (!activeDroneDefinitionIds.has(destroyedId)) {
+      state.world.destroyedDroneIds.delete(destroyedId);
+    }
+  }
+
+  const activeDroneDefinitions = droneDefinitions.filter(
+    (drone) => !state.world.destroyedDroneIds.has(drone.id)
+  );
+
   state.world.activeStartChunk = startChunk;
   state.world.activeEndChunk = endChunk;
   state.world.surfaces = surfaces;
   state.world.hazards = hazards;
   state.world.checkpoints = checkpoints;
-  state.world.drones = reconcileActiveDrones(state.world.drones, droneDefinitions);
+  state.world.drones = reconcileActiveDrones(state.world.drones, activeDroneDefinitions);
   state.world.projectiles = state.world.projectiles.filter((projectile) => {
     if (projectile.chunkIndex === null) return true;
     return projectile.chunkIndex >= startChunk - 1 && projectile.chunkIndex <= endChunk + 1;
@@ -763,6 +775,11 @@ export function findEarliestSurfaceCollision(
 
   for (const surface of state.world.surfaces) {
     const collisionRect = expandedRect(surface, radius);
+
+    if (segmentStartsByLeavingRect(startX, startY, endX, endY, collisionRect)) {
+      continue;
+    }
+
     const hit = segmentRectIntersection(startX, startY, endX, endY, collisionRect);
     if (!hit) continue;
 
@@ -880,6 +897,9 @@ function simulateOrbFlight(state, dt) {
       ? null
       : findEarliestLethalCollision(state, startX, startY, nextX, nextY);
 
+  const blockingTime = Math.min(surfaceHit?.t ?? 1, lethalHit?.t ?? 1);
+  destroyDronesAlongSegment(state, startX, startY, nextX, nextY, blockingTime);
+
   if (lethalHit && (!surfaceHit || lethalHit.t <= surfaceHit.t)) {
     state.orb.x = lethalHit.x ?? startX;
     state.orb.y = lethalHit.y ?? startY;
@@ -908,6 +928,14 @@ function simulateOrbFlight(state, dt) {
 }
 
 function resolveStationaryLethalContacts(state) {
+  destroyDronesAlongSegment(
+    state,
+    state.orb.x,
+    state.orb.y,
+    state.orb.x,
+    state.orb.y
+  );
+
   if (state.orb.invulnerability > 0) return;
 
   const hit = findEarliestLethalCollision(
@@ -923,15 +951,15 @@ function resolveStationaryLethalContacts(state) {
   }
 }
 
-function findEarliestLethalCollision(state, startX, startY, endX, endY) {
-  let earliest = findEarliestHazardCollision(
-    state,
-    startX,
-    startY,
-    endX,
-    endY,
-    GAME_CONFIG.orbRadius
-  );
+function destroyDronesAlongSegment(
+  state,
+  startX,
+  startY,
+  endX,
+  endY,
+  maxTime = 1
+) {
+  const destroyedIds = [];
 
   for (const drone of state.world.drones) {
     const hit = segmentCircleIntersection(
@@ -943,11 +971,34 @@ function findEarliestLethalCollision(state, startX, startY, endX, endY) {
       drone.y,
       GAME_CONFIG.orbRadius + DRONE_CONFIG.radius
     );
-    if (!hit) continue;
-    if (!earliest || hit.t < earliest.t) {
-      earliest = { ...hit, cause: "drone", drone };
-    }
+
+    if (!hit || hit.t > maxTime + 1e-9) continue;
+    destroyedIds.push(drone.id);
   }
+
+  if (destroyedIds.length === 0) return 0;
+
+  const destroyedSet = new Set(destroyedIds);
+  for (const id of destroyedIds) {
+    state.world.destroyedDroneIds.add(id);
+  }
+
+  state.world.drones = state.world.drones.filter(
+    (drone) => !destroyedSet.has(drone.id)
+  );
+
+  return destroyedIds.length;
+}
+
+function findEarliestLethalCollision(state, startX, startY, endX, endY) {
+  let earliest = findEarliestHazardCollision(
+    state,
+    startX,
+    startY,
+    endX,
+    endY,
+    GAME_CONFIG.orbRadius
+  );
 
   for (const projectile of state.world.projectiles) {
     const relativeStartX = projectile.prevX - startX;
@@ -1268,6 +1319,23 @@ function seededUnit(chunkIndex, salt) {
   value ^= value >>> 16;
 
   return (value >>> 0) / 4294967296;
+}
+
+function segmentStartsByLeavingRect(startX, startY, endX, endY, rect) {
+  const epsilon = 1e-7;
+  const dx = endX - startX;
+  const dy = endY - startY;
+  const right = rect.x + rect.width;
+  const bottom = rect.y + rect.height;
+  const withinX = startX >= rect.x - epsilon && startX <= right + epsilon;
+  const withinY = startY >= rect.y - epsilon && startY <= bottom + epsilon;
+
+  if (withinX && Math.abs(startY - rect.y) <= epsilon && dy < 0) return true;
+  if (withinX && Math.abs(startY - bottom) <= epsilon && dy > 0) return true;
+  if (withinY && Math.abs(startX - rect.x) <= epsilon && dx < 0) return true;
+  if (withinY && Math.abs(startX - right) <= epsilon && dx > 0) return true;
+
+  return false;
 }
 
 function segmentRectIntersection(startX, startY, endX, endY, rect) {
