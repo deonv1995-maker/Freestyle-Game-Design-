@@ -170,7 +170,7 @@ test("swept collision catches a fast spear crossing an obstacle", () => {
   assert.equal(hit.normalX, -1);
 });
 
-test("falling spear sticks to the ground instead of passing through it", () => {
+test("falling spear sticks to the ground and automatically relays the player to impact", () => {
   const state = createGameState();
   state.mode = "flying";
   state.spear.x = 0;
@@ -187,6 +187,13 @@ test("falling spear sticks to the ground instead of passing through it", () => {
   assert.equal(state.spear.contact.surfaceId, "starter-ground");
   assert.equal(state.spear.vx, 0);
   assert.equal(state.spear.vy, 0);
+  assert.equal(state.player.x, state.spear.x);
+  assert.equal(state.player.y, state.spear.y);
+  assert.ok(state.teleportPulse > 0);
+
+  const aimResult = beginAim(state, 20, 20, 8);
+  assert.equal(aimResult.teleported, false);
+  assert.equal(state.mode, "aiming");
 });
 
 test("pressing a stuck spear relays the character to its collision point", () => {
@@ -285,7 +292,7 @@ test("walking NPCs patrol without requiring rendering state", () => {
   assert.equal(npc.y, WORLD_CONFIG.groundTop);
 });
 
-test("spear collision throws an NPC and increments the run hit counter", () => {
+test("spear collision knocks an NPC down before removing it and increments the run hit counter once", () => {
   const state = createGameState();
   const npc = getWorldNpcs(state).find((candidate) => candidate.id === "starter-npc-0");
 
@@ -311,8 +318,19 @@ test("spear collision throws an NPC and increments the run hit counter", () => {
   assert.equal(npc.mode, "thrown");
   assert.ok(Math.abs(npc.vx) > 0);
   assert.ok(npc.vy < 0);
+  assert.equal(state.world.defeatedNpcIds.has(npc.id), true);
 
-  stepGame(state, 0.05);
+  let sawFallenState = false;
+  for (let i = 0; i < 60 && getWorldNpcs(state).some((candidate) => candidate.id === npc.id); i += 1) {
+    stepGame(state, 0.05);
+    const activeNpc = getWorldNpcs(state).find((candidate) => candidate.id === npc.id);
+    if (activeNpc?.mode === "fallen") {
+      sawFallenState = true;
+    }
+  }
+
+  assert.equal(sawFallenState, true);
+  assert.equal(getWorldNpcs(state).some((candidate) => candidate.id === npc.id), false);
   assert.equal(state.score.npcHits, 1);
 });
 
