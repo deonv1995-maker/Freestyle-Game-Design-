@@ -1,18 +1,16 @@
 import {
   GAME_CONFIG,
   NPC_CONFIG,
-  beginSlingshot,
-  beginSteering,
-  cancelSlingshot,
+  beginAim,
+  cancelAim,
   createGameState,
-  endSteering,
   getLaunchVector,
   getWorldNpcs,
   getWorldSurfaces,
-  releaseSlingshot,
+  releaseAim,
   stepGame,
-  updateSlingshot,
-  updateSteering
+  updateAim
+
 } from "./game-core.js";
 
 const canvas = document.querySelector("#gameCanvas");
@@ -282,77 +280,16 @@ function drawTrail() {
   ctx.restore();
 }
 
-function drawControlZones() {
-  const middle = viewportWidth * 0.5;
-
-  ctx.save();
-  ctx.fillStyle =
-    state.mode === "charging"
-      ? "rgba(45, 156, 255, 0.075)"
-      : "rgba(45, 156, 255, 0.025)";
-  ctx.fillRect(0, 0, middle, viewportHeight);
-
-  ctx.fillStyle =
-    state.mode === "orb"
-      ? "rgba(88, 198, 255, 0.055)"
-      : "rgba(88, 198, 255, 0.015)";
-  ctx.fillRect(middle, 0, viewportWidth - middle, viewportHeight);
-
-  ctx.strokeStyle = "rgba(145, 215, 255, 0.08)";
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.moveTo(middle, viewportHeight * 0.68);
-  ctx.lineTo(middle, viewportHeight - 18);
-  ctx.stroke();
-
-  ctx.font = "600 10px ui-monospace, monospace";
-  ctx.textBaseline = "bottom";
-
-  ctx.fillStyle =
-    state.mode === "ready" || state.mode === "charging"
-      ? "rgba(170, 226, 255, 0.58)"
-      : "rgba(170, 226, 255, 0.2)";
-  ctx.fillText("LEFT · PULL BACK + RELEASE", 18, viewportHeight - 18);
-
-  const rightLabel = state.mode === "orb" ? "RIGHT · HOLD + DRAG TO STEER" : "RIGHT · STEER IN ORB FORM";
-  const width = ctx.measureText(rightLabel).width;
-  ctx.fillStyle =
-    state.mode === "orb"
-      ? "rgba(170, 226, 255, 0.62)"
-      : "rgba(170, 226, 255, 0.2)";
-  ctx.fillText(rightLabel, viewportWidth - width - 18, viewportHeight - 18);
-
-  ctx.restore();
-}
-
-function drawSlingshotGuide() {
-  if (state.mode !== "charging") return;
+function drawAimGuide() {
+  if (state.mode !== "aiming") return;
 
   const aim = getLaunchVector(state);
   const player = worldToScreen(state.player.x, state.player.y - 28);
-  const anchorX = state.launch.startX;
-  const anchorY = state.launch.startY;
-  const pullX = state.launch.currentX;
-  const pullY = state.launch.currentY;
-  const guideLength = 100 + aim.power * 150;
+  const guideLength = 95 + aim.power * 150;
   const endX = player.x + aim.x * guideLength;
   const endY = player.y + aim.y * guideLength;
 
   ctx.save();
-
-  ctx.strokeStyle = "rgba(81, 188, 255, 0.42)";
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.moveTo(anchorX - 10, anchorY - 8);
-  ctx.lineTo(pullX, pullY);
-  ctx.moveTo(anchorX + 10, anchorY + 8);
-  ctx.lineTo(pullX, pullY);
-  ctx.stroke();
-
-  ctx.fillStyle = "rgba(168, 229, 255, 0.9)";
-  ctx.beginPath();
-  ctx.arc(pullX, pullY, 7, 0, Math.PI * 2);
-  ctx.fill();
 
   ctx.setLineDash([8, 7]);
   ctx.strokeStyle = "rgba(105, 207, 255, 0.8)";
@@ -363,47 +300,28 @@ function drawSlingshotGuide() {
   ctx.stroke();
   ctx.setLineDash([]);
 
-  ctx.strokeStyle = "rgba(188, 236, 255, 0.9)";
+  ctx.fillStyle = "rgba(168, 229, 255, 0.92)";
   ctx.beginPath();
-  ctx.arc(endX, endY, 10 + aim.power * 4, 0, Math.PI * 2);
+  ctx.arc(endX, endY, 5 + aim.power * 3, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.strokeStyle = "rgba(188, 236, 255, 0.68)";
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.arc(endX, endY, 13, 0, Math.PI * 2);
   ctx.stroke();
 
-  const barWidth = 112;
-  const barX = anchorX - barWidth * 0.5;
-  const barY = anchorY + 34;
+  const barWidth = 104;
+  const barX = player.x - barWidth * 0.5;
+  const barY = player.y + 46;
   ctx.fillStyle = "rgba(255,255,255,0.1)";
   roundRect(ctx, barX, barY, barWidth, 7, 4);
   ctx.fill();
-  if (aim.power > 0) {
-    ctx.fillStyle = "rgba(86, 194, 255, 0.92)";
-    roundRect(ctx, barX, barY, barWidth * aim.power, 7, 4);
-    ctx.fill();
-  }
 
-  ctx.restore();
-}
-
-function drawSteeringGuide() {
-  if (state.mode !== "orb" || state.steering.pointerId === null) return;
-
-  const radius = 52;
-  const knobDistance = radius * state.steering.strength;
-  const knobX = state.steering.startX + state.steering.x * knobDistance;
-  const knobY = state.steering.startY + state.steering.y * knobDistance;
-
-  ctx.save();
-  ctx.strokeStyle = "rgba(118, 214, 255, 0.38)";
-  ctx.fillStyle = "rgba(68, 178, 255, 0.08)";
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.arc(state.steering.startX, state.steering.startY, radius, 0, Math.PI * 2);
+  ctx.fillStyle = "rgba(86, 194, 255, 0.92)";
+  roundRect(ctx, barX, barY, barWidth * aim.power, 7, 4);
   ctx.fill();
-  ctx.stroke();
 
-  ctx.fillStyle = "rgba(167, 232, 255, 0.72)";
-  ctx.beginPath();
-  ctx.arc(knobX, knobY, 13, 0, Math.PI * 2);
-  ctx.fill();
   ctx.restore();
 }
 
@@ -428,16 +346,16 @@ function drawPlayer() {
 
   const p = worldToScreen(state.player.x, state.player.y);
   const scale = GAME_CONFIG.cameraZoom;
-  const charging = state.mode === "charging";
+  const aiming = state.mode === "aiming";
   const aim = getLaunchVector(state);
   const facing = aim.x < -0.05 ? -1 : 1;
-  const lean = charging ? -aim.x * 3.5 * state.launch.power : 0;
+  const lean = aiming ? aim.x * 3.5 * state.launch.power : 0;
 
   ctx.save();
   ctx.translate(p.x, p.y);
   ctx.scale(scale, scale);
 
-  if (charging) {
+  if (aiming) {
     const aura = 18 + state.launch.power * 18;
     ctx.strokeStyle = `rgba(70, 187, 255, ${0.22 + state.launch.power * 0.45})`;
     ctx.lineWidth = 2;
@@ -462,7 +380,7 @@ function drawPlayer() {
   ctx.moveTo(lean * 0.15, -42);
   ctx.lineTo(-lean * 0.12, -18);
 
-  if (charging) {
+  if (aiming) {
     ctx.moveTo(lean * 0.05, -36);
     ctx.lineTo(-facing * 9, -29);
     ctx.lineTo(-facing * 15, -20);
@@ -482,7 +400,7 @@ function drawPlayer() {
   ctx.lineTo(9, 0);
   ctx.stroke();
 
-  if (charging) {
+  if (aiming) {
     ctx.fillStyle = "rgba(116, 211, 255, 0.9)";
     ctx.beginPath();
     ctx.arc(0, -31, 3 + state.launch.power * 4, 0, Math.PI * 2);
@@ -550,17 +468,24 @@ function drawOrb() {
     ctx.stroke();
   }
 
+  if (state.animation.bouncePulse > 0) {
+    const bounceRadius = radius * (1.2 + (1 - state.animation.bouncePulse) * 2.2);
+    ctx.strokeStyle = `rgba(204, 244, 255, ${state.animation.bouncePulse * 0.72})`;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, bounceRadius, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
   ctx.restore();
 }
 
 function render() {
   drawBackground();
-  drawControlZones();
   drawWorldSurfaces();
   drawNpcs();
   drawTrail();
-  drawSlingshotGuide();
-  drawSteeringGuide();
+  drawAimGuide();
   drawReformPulse();
   drawPlayer();
   drawOrb();
@@ -579,9 +504,9 @@ function updateHud() {
   if (snapshot === lastHudSnapshot) return;
   lastHudSnapshot = snapshot;
 
-  if (state.mode === "charging") {
+  if (state.mode === "aiming") {
     statusNode.textContent =
-      "POWER DRAW · " +
+      "AIMING · POWER " +
       Math.round(state.launch.power * 100) +
       "% · HITS " +
       state.score.npcHits +
@@ -589,7 +514,7 @@ function updateHud() {
       progressMetres +
       "m";
     hintNode.textContent =
-      "Left side: pull back opposite the direction you want to launch, then release.";
+      "Drag in the direction you want to travel, then release to transform and launch.";
     return;
   }
 
@@ -603,7 +528,7 @@ function updateHud() {
       progressMetres +
       "m";
     hintNode.textContent =
-      "Right side: hold and drag like a joystick to bend the orb's flight.";
+      "Sides and undersides bounce the orb. Land on top of a floor or platform to reform.";
     return;
   }
 
@@ -616,7 +541,7 @@ function updateHud() {
     progressMetres +
     "m";
   hintNode.textContent =
-    "Left side: press and pull back like a slingshot. Release to transform and launch.";
+    "Press anywhere, drag in the direction you want to move, then release.";
 }
 
 function recordTrail() {
@@ -656,67 +581,42 @@ function pointerPosition(event) {
 }
 
 canvas.addEventListener("pointerdown", (event) => {
+  if (state.mode !== "ready") return;
+
   event.preventDefault();
   const point = pointerPosition(event);
-  const leftSide = point.x < viewportWidth * 0.5;
-  let accepted = false;
 
-  if (leftSide && state.mode === "ready") {
-    accepted = beginSlingshot(state, point.x, point.y, event.pointerId);
-  } else if (!leftSide && state.mode === "orb") {
-    accepted = beginSteering(state, point.x, point.y, event.pointerId);
-  }
-
-  if (accepted) {
+  if (beginAim(state, point.x, point.y, event.pointerId)) {
     canvas.setPointerCapture?.(event.pointerId);
     updateHud();
   }
 });
 
 canvas.addEventListener("pointermove", (event) => {
+  if (state.launch.pointerId !== event.pointerId) return;
+
+  event.preventDefault();
   const point = pointerPosition(event);
-
-  if (state.launch.pointerId === event.pointerId) {
-    event.preventDefault();
-    updateSlingshot(state, point.x, point.y, event.pointerId);
-    return;
-  }
-
-  if (state.steering.pointerId === event.pointerId) {
-    event.preventDefault();
-    updateSteering(state, point.x, point.y, event.pointerId);
-  }
+  updateAim(state, point.x, point.y, event.pointerId);
 });
 
 canvas.addEventListener("pointerup", (event) => {
-  const wasLaunchPointer = state.launch.pointerId === event.pointerId;
-  const wasSteeringPointer = state.steering.pointerId === event.pointerId;
+  if (state.launch.pointerId !== event.pointerId) return;
 
-  if (wasLaunchPointer) {
-    event.preventDefault();
-    if (releaseSlingshot(state, event.pointerId)) {
-      trail = [{ x: state.orb.x, y: state.orb.y }];
-    }
-    updateHud();
-  } else if (wasSteeringPointer) {
-    event.preventDefault();
-    endSteering(state, event.pointerId);
+  event.preventDefault();
+  if (releaseAim(state, event.pointerId)) {
+    trail = [{ x: state.orb.x, y: state.orb.y }];
   }
-
   canvas.releasePointerCapture?.(event.pointerId);
+  updateHud();
 });
 
 canvas.addEventListener("pointercancel", (event) => {
-  if (state.launch.pointerId === event.pointerId) {
-    cancelSlingshot(state, event.pointerId);
-    updateHud();
-  }
+  if (state.launch.pointerId !== event.pointerId) return;
 
-  if (state.steering.pointerId === event.pointerId) {
-    endSteering(state, event.pointerId);
-  }
-
+  cancelAim(state, event.pointerId);
   canvas.releasePointerCapture?.(event.pointerId);
+  updateHud();
 });
 
 resetButton.addEventListener("click", () => {
