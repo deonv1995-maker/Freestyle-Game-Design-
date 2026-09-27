@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  CITY_CONFIG,
   GAME_CONFIG,
   NPC_CONFIG,
   STARTER_SURFACES,
@@ -260,11 +261,12 @@ test("underside impact with a platform bounces downward instead of sticking", ()
 
 test("top of an obstacle is not standable and bounces the orb", () => {
   const state = createGameState();
+  const wall = getWorldSurfaces(state).find((surface) => surface.id === "wall-a");
 
   state.mode = "orb";
   state.orb.active = true;
-  state.orb.x = 366;
-  state.orb.y = -12;
+  state.orb.x = wall.x + wall.width * 0.5;
+  state.orb.y = wall.y - GAME_CONFIG.orbRadius - 8;
   state.orb.vx = 0;
   state.orb.vy = 420;
 
@@ -387,6 +389,43 @@ test("active world surfaces remain unique valid rectangles", () => {
     assert.ok(["ground", "platform", "obstacle"].includes(surface.type));
     assert.equal(ids.has(surface.id), false);
     ids.add(surface.id);
+  }
+});
+
+test("city surfaces carry presentation metadata without changing collision semantics", () => {
+  const state = createGameState();
+
+  for (const surface of getWorldSurfaces(state)) {
+    assert.equal(typeof surface.visual, "string");
+    assert.ok(surface.visual.length > 0);
+    assert.ok(["ground", "platform", "obstacle"].includes(surface.type));
+  }
+
+  const hoverCars = getWorldSurfaces(state).filter(
+    (surface) => surface.type === "platform" && surface.visual === "hoverCar"
+  );
+  assert.ok(hoverCars.length > 0);
+});
+
+test("tower obstacles defeat the simple full-power 45-degree flyover arc", () => {
+  const diagonalVerticalSpeed = GAME_CONFIG.maxLaunchSpeed / Math.sqrt(2);
+  const diagonalArcRise =
+    (diagonalVerticalSpeed * diagonalVerticalSpeed) / (2 * GAME_CONFIG.orbGravity);
+
+  assert.ok(CITY_CONFIG.minTowerHeight > diagonalArcRise);
+
+  for (let chunkIndex = 0; chunkIndex < 8; chunkIndex += 1) {
+    const obstacles = generateWorldChunk(chunkIndex).filter(
+      (surface) => surface.type === "obstacle"
+    );
+    assert.ok(obstacles.length > 0);
+    assert.ok(
+      obstacles.every(
+        (surface) =>
+          surface.height >= CITY_CONFIG.minTowerHeight &&
+          surface.height <= CITY_CONFIG.maxTowerHeight
+      )
+    );
   }
 });
 

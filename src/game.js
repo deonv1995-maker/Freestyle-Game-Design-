@@ -131,50 +131,164 @@ function drawWorldSurfaces() {
     const height = surface.height * scale;
 
     if (
-      p.x > viewportWidth + 80 ||
-      p.x + width < -80 ||
-      p.y > viewportHeight + 80 ||
-      p.y + height < -80
+      p.x > viewportWidth + 100 ||
+      p.x + width < -100 ||
+      p.y > viewportHeight + 100 ||
+      p.y + height < -100
     ) {
       continue;
     }
 
     if (surface.type === "ground") {
-      ctx.fillStyle = "#202a25";
-      ctx.fillRect(p.x, p.y, width, height);
-      ctx.fillStyle = "#5f7a58";
-      ctx.fillRect(p.x, p.y, width, 7 * scale);
-      ctx.fillStyle = "rgba(151, 184, 134, 0.42)";
-      for (let x = p.x + 16 * scale; x < p.x + width; x += 34 * scale) {
-        ctx.fillRect(x, p.y - 4 * scale, 2 * scale, 6 * scale);
-      }
+      drawCityDeckSurface(p, width, height, scale);
       continue;
     }
 
-    const isPlatform = surface.type === "platform";
-    ctx.fillStyle = isPlatform ? "#36465f" : "#493d48";
-    ctx.strokeStyle = isPlatform ? "#8499bb" : "#9f7f8a";
-    ctx.lineWidth = Math.max(1, 2 * scale);
-    roundRect(
-      ctx,
-      p.x,
-      p.y,
-      width,
-      height,
-      (isPlatform ? 6 : 4) * scale
-    );
-    ctx.fill();
-    ctx.stroke();
+    if (surface.type === "platform") {
+      drawFuturePlatformSurface(surface, p, width, height, scale);
+      continue;
+    }
 
-    ctx.strokeStyle = isPlatform
-      ? "rgba(203, 220, 244, 0.22)"
-      : "rgba(232, 199, 208, 0.18)";
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(p.x + 8 * scale, p.y + 6 * scale);
-    ctx.lineTo(p.x + width - 8 * scale, p.y + 6 * scale);
-    ctx.stroke();
+    drawFutureObstacleSurface(surface, p, width, height, scale);
   }
+
+  ctx.restore();
+}
+
+function drawCityDeckSurface(p, width, height, scale) {
+  ctx.fillStyle = "#111722";
+  ctx.fillRect(p.x, p.y, width, height);
+
+  ctx.fillStyle = "#253847";
+  ctx.fillRect(p.x, p.y, width, 10 * scale);
+
+  ctx.fillStyle = "rgba(63, 212, 255, 0.42)";
+  ctx.fillRect(p.x, p.y + 10 * scale, width, 2 * scale);
+
+  const laneSpacing = 82 * scale;
+  const laneWidth = 30 * scale;
+  for (let x = p.x + 18 * scale; x < p.x + width; x += laneSpacing) {
+    ctx.fillStyle = "rgba(107, 140, 164, 0.16)";
+    ctx.fillRect(x, p.y + 23 * scale, laneWidth, 3 * scale);
+  }
+}
+
+function drawFuturePlatformSurface(surface, p, width, height, scale) {
+  if (surface.visual === "hoverCar") {
+    drawHoverCarSurface(p, width, height, scale);
+    return;
+  }
+
+  const landingPad = surface.visual === "landingPad";
+  ctx.save();
+
+  ctx.shadowColor = landingPad
+    ? "rgba(77, 221, 255, 0.28)"
+    : "rgba(134, 121, 255, 0.22)";
+  ctx.shadowBlur = 13 * scale;
+
+  ctx.fillStyle = landingPad ? "#26394a" : "#30354e";
+  ctx.strokeStyle = landingPad ? "#65dcff" : "#938dff";
+  ctx.lineWidth = Math.max(1, 2 * scale);
+  roundRect(ctx, p.x, p.y, width, height, 6 * scale);
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = landingPad
+    ? "rgba(118, 226, 255, 0.82)"
+    : "rgba(184, 174, 255, 0.72)";
+  ctx.fillRect(p.x + 10 * scale, p.y + 4 * scale, Math.max(0, width - 20 * scale), 2 * scale);
+
+  const panelWidth = 34 * scale;
+  for (let x = p.x + 16 * scale; x < p.x + width - 12 * scale; x += 52 * scale) {
+    ctx.fillStyle = "rgba(8, 13, 24, 0.42)";
+    ctx.fillRect(x, p.y + 11 * scale, Math.min(panelWidth, p.x + width - x - 8 * scale), 6 * scale);
+  }
+
+  ctx.restore();
+}
+
+function drawHoverCarSurface(p, width, height, scale) {
+  ctx.save();
+
+  ctx.shadowColor = "rgba(71, 202, 255, 0.52)";
+  ctx.shadowBlur = 18 * scale;
+  ctx.fillStyle = "#283747";
+  ctx.strokeStyle = "#71dfff";
+  ctx.lineWidth = Math.max(1, 2 * scale);
+  roundRect(ctx, p.x, p.y, width, height, 12 * scale);
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = "#172333";
+  roundRect(
+    ctx,
+    p.x + width * 0.24,
+    p.y + 6 * scale,
+    width * 0.4,
+    Math.max(5 * scale, height * 0.4),
+    8 * scale
+  );
+  ctx.fill();
+
+  ctx.fillStyle = "rgba(135, 229, 255, 0.88)";
+  ctx.fillRect(p.x + 12 * scale, p.y + 4 * scale, Math.max(0, width - 24 * scale), 2 * scale);
+
+  ctx.fillStyle = "rgba(78, 191, 255, 0.55)";
+  const thrusterY = p.y + height + 4 * scale;
+  ctx.fillRect(p.x + width * 0.16, thrusterY, width * 0.2, 3 * scale);
+  ctx.fillRect(p.x + width * 0.64, thrusterY, width * 0.2, 3 * scale);
+
+  ctx.restore();
+}
+
+function drawFutureObstacleSurface(surface, p, width, height, scale) {
+  const isSpire = surface.visual === "spire";
+  const topTrim = Math.max(5 * scale, Math.min(14 * scale, height * 0.04));
+
+  ctx.save();
+
+  const gradient = ctx.createLinearGradient(p.x, 0, p.x + width, 0);
+  gradient.addColorStop(0, isSpire ? "#252a44" : "#202b3a");
+  gradient.addColorStop(0.55, isSpire ? "#343956" : "#2b3b4d");
+  gradient.addColorStop(1, "#17212e");
+  ctx.fillStyle = gradient;
+  ctx.strokeStyle = isSpire ? "#827cff" : "#4ed5ff";
+  ctx.lineWidth = Math.max(1, 2 * scale);
+  roundRect(ctx, p.x, p.y, width, height, 5 * scale);
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.fillStyle = isSpire
+    ? "rgba(143, 129, 255, 0.9)"
+    : "rgba(75, 220, 255, 0.9)";
+  ctx.fillRect(p.x + 6 * scale, p.y + topTrim, 3 * scale, Math.max(0, height - topTrim * 2));
+
+  const visibleTop = Math.max(p.y + 28 * scale, -30);
+  const visibleBottom = Math.min(p.y + height - 22 * scale, viewportHeight + 30);
+  const rowStep = 40 * scale;
+  const columnStep = 34 * scale;
+  const windowWidth = 13 * scale;
+  const windowHeight = 7 * scale;
+
+  for (let y = visibleTop; y < visibleBottom; y += rowStep) {
+    for (let x = p.x + 22 * scale; x < p.x + width - 14 * scale; x += columnStep) {
+      ctx.fillStyle =
+        (Math.floor((x + y) / Math.max(1, 22 * scale)) % 3 === 0)
+          ? "rgba(255, 215, 122, 0.52)"
+          : "rgba(91, 188, 230, 0.28)";
+      ctx.fillRect(x, y, Math.min(windowWidth, p.x + width - x - 8 * scale), windowHeight);
+    }
+  }
+
+  ctx.shadowColor = isSpire
+    ? "rgba(141, 121, 255, 0.48)"
+    : "rgba(64, 211, 255, 0.48)";
+  ctx.shadowBlur = 14 * scale;
+  ctx.fillStyle = isSpire ? "#8f80ff" : "#62ddff";
+  ctx.fillRect(p.x + 8 * scale, p.y + 5 * scale, Math.max(0, width - 16 * scale), 3 * scale);
 
   ctx.restore();
 }
