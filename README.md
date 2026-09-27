@@ -4,7 +4,7 @@ An experimental game-design repository for rapidly turning ideas into playable p
 
 This project is intentionally open-ended. It may become one game, several experiments, or a place to test unusual mechanics before deciding what deserves deeper development.
 
-## Current playable slice — Spear Relay 0.3
+## Current playable slice — Spear Relay 0.4
 
 The current prototype is a mobile-first 2D traversal mechanic:
 
@@ -13,8 +13,11 @@ The current prototype is a mobile-first 2D traversal mechanic:
 - drag distance controls throw power;
 - release to throw the spear;
 - while the spear is flying, the camera follows it;
-- the spear now collides with the floor, platforms and solid obstacles instead of passing through them;\n- press again while the spear is flying or planted to relocate the character to the spear's current position;
-- that same press immediately starts the next aiming gesture.
+- the spear now collides with the floor, platforms and solid obstacles instead of passing through them;
+- press again while the spear is flying or planted to relocate the character to the spear's current position;
+- that same press immediately starts the next aiming gesture;
+- the player now visibly winds up, leans and follows through when aiming and throwing;
+- relaying to a spear that is still in flight enters a tucked airborne pose with slowed visual motion and a precision reticle.
 
 The handmade opening section now flows into an endless deterministic traversal course. As play moves forward, nearby world chunks are generated from a fixed seed, each with continuous ground plus varied platforms and obstacles. Old distant procedural chunks are discarded and can be regenerated identically later, keeping runtime memory bounded on mobile.
 
