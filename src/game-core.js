@@ -7,6 +7,7 @@ export const GAME_CONFIG = Object.freeze({
   maxAimDistance: 220,
   aimDeadzone: 12,
   cameraSharpness: 10,
+  cameraZoom: 0.78,
   handOffset: 30,
   handHeight: 34,
   throwFollowThroughDuration: 0.28,
@@ -22,6 +23,79 @@ export const WORLD_CONFIG = Object.freeze({
   chunksBehind: 2,
   chunksAhead: 4
 });
+
+export const NPC_CONFIG = Object.freeze({
+  width: 28,
+  height: 56,
+  perChunk: 2,
+  minWalkSpeed: 24,
+  maxWalkSpeed: 42,
+  gravity: 680,
+  hitVelocityScale: 0.58,
+  hitLift: 170,
+  spearCarryThrough: 0.82,
+  recoveryDelay: 0.8
+});
+
+const STARTER_NPCS = Object.freeze([
+  Object.freeze({
+    id: "starter-npc-0",
+    chunkIndex: null,
+    x: 80,
+    y: GROUND_TOP,
+    patrolMin: 24,
+    patrolMax: 255,
+    direction: 1,
+    speed: 28,
+    mode: "idle",
+    behaviorTimer: 1.15,
+    behaviorSeed: 0.22,
+    behaviorPhase: 0,
+    vx: 0,
+    vy: 0,
+    rotation: 0,
+    rotationVelocity: 0,
+    hitFlash: 0
+  }),
+  Object.freeze({
+    id: "starter-npc-1",
+    chunkIndex: null,
+    x: 620,
+    y: GROUND_TOP,
+    patrolMin: 520,
+    patrolMax: 760,
+    direction: -1,
+    speed: 34,
+    mode: "walking",
+    behaviorTimer: 2.6,
+    behaviorSeed: 0.63,
+    behaviorPhase: 0,
+    vx: 0,
+    vy: 0,
+    rotation: 0,
+    rotationVelocity: 0,
+    hitFlash: 0
+  }),
+  Object.freeze({
+    id: "starter-npc-2",
+    chunkIndex: null,
+    x: 1240,
+    y: GROUND_TOP,
+    patrolMin: 1120,
+    patrolMax: 1400,
+    direction: 1,
+    speed: 31,
+    mode: "walking",
+    behaviorTimer: 1.9,
+    behaviorSeed: 0.41,
+    behaviorPhase: 0,
+    vx: 0,
+    vy: 0,
+    rotation: 0,
+    rotationVelocity: 0,
+    hitFlash: 0
+  })
+]);
 
 export const STARTER_SURFACES = Object.freeze([
   Object.freeze({
@@ -81,6 +155,9 @@ export function createGameState() {
   const state = {
     mode: "ready",
     throwCount: 0,
+    score: {
+      npcHits: 0
+    },
     player: { ...START_POSITION },
     spear: {
       x: START_POSITION.x,
@@ -118,7 +195,8 @@ export function createGameState() {
       maxProgressX: START_POSITION.x,
       activeStartChunk: null,
       activeEndChunk: null,
-      surfaces: []
+      surfaces: [],
+      npcs: []
     }
   };
 
@@ -240,6 +318,8 @@ export function stepGame(state, deltaSeconds) {
     );
   }
 
+  updateNpcs(state, dt);
+
   if (state.mode === "flying") {
     const startX = state.spear.x;
     const startY = state.spear.y;
@@ -249,19 +329,28 @@ export function stepGame(state, deltaSeconds) {
     const nextY = startY + state.spear.vy * dt;
 
     refreshWorldForFocus(state, nextX);
-    const hit = findEarliestSurfaceCollision(state, startX, startY, nextX, nextY);
+    const surfaceHit = findEarliestSurfaceCollision(state, startX, startY, nextX, nextY);
+    const npcHit = findEarliestNpcCollision(state, startX, startY, nextX, nextY);
 
-    if (hit) {
-      state.spear.x = hit.x;
-      state.spear.y = hit.y;
-      state.spear.travel += Math.hypot(hit.x - startX, hit.y - startY);
+    if (npcHit && (!surfaceHit || npcHit.t < surfaceHit.t)) {
+      state.spear.x = npcHit.x;
+      state.spear.y = npcHit.y;
+      state.spear.travel += Math.hypot(npcHit.x - startX, npcHit.y - startY);
+      state.spear.angle = Math.atan2(state.spear.vy, state.spear.vx);
+      throwNpcWithSpear(state, npcHit.npc);
+      state.spear.vx *= NPC_CONFIG.spearCarryThrough;
+      state.spear.vy *= NPC_CONFIG.spearCarryThrough;
+    } else if (surfaceHit) {
+      state.spear.x = surfaceHit.x;
+      state.spear.y = surfaceHit.y;
+      state.spear.travel += Math.hypot(surfaceHit.x - startX, surfaceHit.y - startY);
       state.spear.angle = Math.atan2(state.spear.vy, state.spear.vx);
       state.spear.vx = 0;
       state.spear.vy = 0;
       state.spear.contact = {
-        surfaceId: hit.surface.id,
-        normalX: hit.normalX,
-        normalY: hit.normalY
+        surfaceId: surfaceHit.surface.id,
+        normalX: surfaceHit.normalX,
+        normalY: surfaceHit.normalY
       };
       state.mode = "stuck";
     } else {
@@ -303,6 +392,10 @@ export function getWorldSurfaces(state) {
   return state.world.surfaces;
 }
 
+export function getWorldNpcs(state) {
+  return state.world.npcs;
+}
+
 export function refreshWorldForFocus(state, focusX) {
   const focusChunk = getChunkIndexForX(focusX);
   const startChunk = Math.max(0, focusChunk - WORLD_CONFIG.chunksBehind);
@@ -317,14 +410,18 @@ export function refreshWorldForFocus(state, focusX) {
   }
 
   const surfaces = [...STARTER_SURFACES];
+  const npcDefinitions = STARTER_NPCS.map((npc) => ({ ...npc }));
 
   for (let chunkIndex = startChunk; chunkIndex <= endChunk; chunkIndex += 1) {
-    surfaces.push(...generateWorldChunk(chunkIndex));
+    const chunkSurfaces = generateWorldChunk(chunkIndex);
+    surfaces.push(...chunkSurfaces);
+    npcDefinitions.push(...generateNpcChunk(chunkIndex, chunkSurfaces));
   }
 
   state.world.activeStartChunk = startChunk;
   state.world.activeEndChunk = endChunk;
   state.world.surfaces = surfaces;
+  state.world.npcs = reconcileActiveNpcs(state.world.npcs, npcDefinitions);
   return true;
 }
 
@@ -388,6 +485,47 @@ export function generateWorldChunk(chunkIndex) {
   return surfaces;
 }
 
+export function generateNpcChunk(chunkIndex, chunkSurfaces = null) {
+  const safeIndex = Math.max(0, Math.floor(chunkIndex));
+  const chunkX = WORLD_CONFIG.proceduralStartX + safeIndex * WORLD_CONFIG.chunkWidth;
+  const surfaces = chunkSurfaces || generateWorldChunk(safeIndex);
+  const npcs = [];
+
+  for (let npcIndex = 0; npcIndex < NPC_CONFIG.perChunk; npcIndex += 1) {
+    const lane = (npcIndex + 1) / (NPC_CONFIG.perChunk + 1);
+    const jitter = (seededUnit(safeIndex, 40 + npcIndex) - 0.5) * 110;
+    const preferredX = chunkX + WORLD_CONFIG.chunkWidth * lane + jitter;
+    const x = pickNpcSpawnX(surfaces, chunkX, preferredX);
+    const behaviorSeed = seededUnit(safeIndex, 60 + npcIndex);
+    const speed =
+      NPC_CONFIG.minWalkSpeed +
+      behaviorSeed * (NPC_CONFIG.maxWalkSpeed - NPC_CONFIG.minWalkSpeed);
+    const patrolHalf = 72 + seededUnit(safeIndex, 70 + npcIndex) * 62;
+
+    npcs.push({
+      id: "chunk-" + safeIndex + "-npc-" + npcIndex,
+      chunkIndex: safeIndex,
+      x,
+      y: GROUND_TOP,
+      patrolMin: Math.max(chunkX + 24, x - patrolHalf),
+      patrolMax: Math.min(chunkX + WORLD_CONFIG.chunkWidth - 24, x + patrolHalf),
+      direction: seededUnit(safeIndex, 80 + npcIndex) < 0.5 ? -1 : 1,
+      speed,
+      mode: seededUnit(safeIndex, 90 + npcIndex) < 0.28 ? "idle" : "walking",
+      behaviorTimer: 1.2 + seededUnit(safeIndex, 100 + npcIndex) * 2.2,
+      behaviorSeed,
+      behaviorPhase: 0,
+      vx: 0,
+      vy: 0,
+      rotation: 0,
+      rotationVelocity: 0,
+      hitFlash: 0
+    });
+  }
+
+  return npcs;
+}
+
 export function findEarliestSurfaceCollision(state, startX, startY, endX, endY) {
   let earliest = null;
 
@@ -401,6 +539,166 @@ export function findEarliestSurfaceCollision(state, startX, startY, endX, endY) 
   }
 
   return earliest;
+}
+
+export function findEarliestNpcCollision(state, startX, startY, endX, endY) {
+  let earliest = null;
+
+  for (const npc of state.world.npcs) {
+    if (npc.mode === "thrown") continue;
+
+    const bounds = {
+      x: npc.x - NPC_CONFIG.width * 0.5,
+      y: npc.y - NPC_CONFIG.height,
+      width: NPC_CONFIG.width,
+      height: NPC_CONFIG.height
+    };
+    const hit = segmentRectIntersection(startX, startY, endX, endY, bounds);
+    if (!hit) continue;
+
+    if (!earliest || hit.t < earliest.t) {
+      earliest = { ...hit, npc };
+    }
+  }
+
+  return earliest;
+}
+
+function reconcileActiveNpcs(existingNpcs, definitions) {
+  const previousById = new Map(existingNpcs.map((npc) => [npc.id, npc]));
+  return definitions.map((definition) => previousById.get(definition.id) || { ...definition });
+}
+
+function updateNpcs(state, dt) {
+  for (const npc of state.world.npcs) {
+    npc.hitFlash = Math.max(0, npc.hitFlash - dt * 3.5);
+
+    if (npc.mode === "thrown") {
+      npc.vy += NPC_CONFIG.gravity * dt;
+      npc.x += npc.vx * dt;
+      npc.y += npc.vy * dt;
+      npc.rotation += npc.rotationVelocity * dt;
+
+      if (npc.y >= GROUND_TOP) {
+        npc.y = GROUND_TOP;
+        npc.vx = 0;
+        npc.vy = 0;
+        npc.rotation = 0;
+        npc.rotationVelocity = 0;
+        npc.mode = "recovering";
+        npc.behaviorTimer = NPC_CONFIG.recoveryDelay;
+      }
+      continue;
+    }
+
+    if (npc.mode === "recovering") {
+      npc.behaviorTimer -= dt;
+      if (npc.behaviorTimer <= 0) {
+        npc.mode = "walking";
+        npc.behaviorTimer = 1.8 + npc.behaviorSeed * 1.8;
+      }
+      continue;
+    }
+
+    npc.y = GROUND_TOP;
+    npc.behaviorTimer -= dt;
+
+    if (npc.mode === "walking") {
+      const nextX = npc.x + npc.direction * npc.speed * dt;
+      const outsidePatrol = nextX < npc.patrolMin || nextX > npc.patrolMax;
+      const blocked = isNpcWalkBlocked(state.world.surfaces, npc, nextX);
+
+      if (outsidePatrol || blocked) {
+        npc.direction *= -1;
+      } else {
+        npc.x = nextX;
+      }
+    }
+
+    if (npc.behaviorTimer <= 0) {
+      npc.behaviorPhase += 1;
+      if (npc.mode === "walking") {
+        npc.mode = "idle";
+        npc.behaviorTimer = 0.7 + npc.behaviorSeed * 1.15;
+      } else {
+        npc.mode = "walking";
+        npc.direction = npc.behaviorPhase % 2 === 0 ? 1 : -1;
+        npc.behaviorTimer = 1.8 + npc.behaviorSeed * 2.2;
+      }
+    }
+  }
+}
+
+function throwNpcWithSpear(state, npc) {
+  npc.mode = "thrown";
+  npc.vx = state.spear.vx * NPC_CONFIG.hitVelocityScale;
+  npc.vy = Math.min(-90, state.spear.vy * 0.24 - NPC_CONFIG.hitLift);
+  npc.rotationVelocity = clamp(state.spear.vx * 0.012, -9, 9);
+  npc.hitFlash = 1;
+  npc.behaviorTimer = NPC_CONFIG.recoveryDelay;
+  npc.direction = state.spear.vx < 0 ? -1 : 1;
+  state.score.npcHits += 1;
+}
+
+function isNpcWalkBlocked(surfaces, npc, nextX) {
+  const halfWidth = NPC_CONFIG.width * 0.5 + 5;
+
+  return surfaces.some(
+    (surface) =>
+      surface.type === "obstacle" &&
+      npc.y >= surface.y &&
+      npc.y <= surface.y + surface.height + 1 &&
+      nextX + halfWidth > surface.x &&
+      nextX - halfWidth < surface.x + surface.width
+  );
+}
+
+function pickNpcSpawnX(surfaces, chunkX, preferredX) {
+  const safeLeft = chunkX + 48;
+  const safeRight = chunkX + WORLD_CONFIG.chunkWidth - 48;
+  const clearance = NPC_CONFIG.width + 18;
+  const obstacles = surfaces
+    .filter((surface) => surface.type === "obstacle")
+    .sort((a, b) => a.x - b.x);
+
+  const ranges = [];
+  let cursor = safeLeft;
+
+  for (const obstacle of obstacles) {
+    const blockedStart = Math.max(safeLeft, obstacle.x - clearance);
+    const blockedEnd = Math.min(safeRight, obstacle.x + obstacle.width + clearance);
+
+    if (blockedStart > cursor) {
+      ranges.push([cursor, blockedStart]);
+    }
+    cursor = Math.max(cursor, blockedEnd);
+  }
+
+  if (cursor < safeRight) {
+    ranges.push([cursor, safeRight]);
+  }
+
+  if (ranges.length === 0) {
+    return clamp(preferredX, safeLeft, safeRight);
+  }
+
+  let bestRange = ranges[0];
+  let bestDistance = Infinity;
+
+  for (const range of ranges) {
+    if (preferredX >= range[0] && preferredX <= range[1]) {
+      return preferredX;
+    }
+
+    const nearest = clamp(preferredX, range[0], range[1]);
+    const distance = Math.abs(nearest - preferredX);
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      bestRange = range;
+    }
+  }
+
+  return clamp(preferredX, bestRange[0], bestRange[1]);
 }
 
 function getChunkIndexForX(x) {
