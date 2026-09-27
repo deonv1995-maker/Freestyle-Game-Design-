@@ -61,6 +61,7 @@ export function createGameState() {
     animation: {
       clock: 0,
       airborneAim: false,
+      playerAirborne: false,
       airborneAimClock: 0,
       throwFollowThrough: 0,
       throwDirectionX: 1,
@@ -91,6 +92,7 @@ export function beginAim(state, pointerX, pointerY, pointerId = 0) {
   state.spear.contact = null;
 
   state.animation.airborneAim = relayedFromFlight;
+  state.animation.playerAirborne = relayedFromFlight;
   state.animation.airborneAimClock = 0;
   state.animation.throwFollowThrough = 0;
 
