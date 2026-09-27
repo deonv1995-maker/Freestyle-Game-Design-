@@ -219,3 +219,11 @@ Reason: the course should read as a deliberately enclosed launch chamber at the 
 Decision: persistent laser timing remains centralized in `HAZARD_CONFIG`, but the base cycle is doubled from 3.6 seconds to 7.2 seconds and the minimum high-difficulty cycle is doubled from 1.8 seconds to 3.6 seconds. Beam geometry, active-ratio scaling, collision behavior and touch slow motion are unchanged.
 
 Reason: doubling the cycle duration makes the laser on/off cadence exactly half as fast while preserving the existing single-source-of-truth difficulty model and hazard behavior.
+
+## 2026-09-27 — Laser beam travel is gradual
+
+Decision: laser activation no longer makes the full cross-corridor beam exist instantly. Beam extension is driven by the authoritative laser phase and a centralized `HAZARD_CONFIG.laserBeamTravelDuration` of 1.8 seconds. During that interval the beam grows from the configured emitter side toward the receiver, after which it remains full length for the rest of the active window.
+
+Decision: laser collision uses the same beam-progress value as rendering. The lethal rectangle therefore expands with the visible beam from the correct source wall instead of using the laser's full hardware span before the beam reaches it. Touch slow motion continues to slow beam travel automatically because both cadence and beam progress derive from the shared gameplay clock.
+
+Reason: the slower cadence should also be readable spatially; the player must be able to see the beam crossing the corridor rather than having an invisible full-width collision appear ahead of the visual effect.

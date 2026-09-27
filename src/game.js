@@ -345,6 +345,13 @@ function drawLaser(hazard) {
   }
 
   const sourceSide = hazard.laser?.sourceSide === "right" ? "right" : "left";
+  const beamProgress = Math.min(
+    1,
+    Math.max(0, hazard.laser?.beamProgress ?? 0)
+  );
+  const beamWidth = width * beamProgress;
+  const beamX =
+    sourceSide === "left" ? p.x : p.x + width - beamWidth;
   const centerY = p.y + height * 0.5;
   const sourceX = sourceSide === "left" ? p.x : p.x + width;
   const receiverX = sourceSide === "left" ? p.x + width : p.x;
@@ -374,21 +381,27 @@ function drawLaser(hazard) {
   ctx.arc(sourceX, centerY, emitterRadius * 0.34, 0, Math.PI * 2);
   ctx.fill();
 
-  if (hazard.active) {
+  if (hazard.active && beamWidth > 0) {
     ctx.globalCompositeOperation = "lighter";
     ctx.shadowColor = "rgba(255, 70, 96, 0.95)";
     ctx.shadowBlur = 18;
 
     ctx.fillStyle = "rgba(255, 67, 91, 0.88)";
-    ctx.fillRect(p.x, p.y, width, height);
+    ctx.fillRect(beamX, p.y, beamWidth, height);
 
     ctx.fillStyle = "rgba(255, 225, 230, 0.96)";
     ctx.fillRect(
-      p.x,
+      beamX,
       p.y + height * 0.34,
-      width,
+      beamWidth,
       Math.max(1, height * 0.32)
     );
+
+    const tipX = sourceSide === "left" ? beamX + beamWidth : beamX;
+    ctx.fillStyle = "rgba(255, 239, 242, 0.98)";
+    ctx.beginPath();
+    ctx.arc(tipX, centerY, Math.max(2, 4 * scale), 0, Math.PI * 2);
+    ctx.fill();
   }
 
   ctx.restore();
