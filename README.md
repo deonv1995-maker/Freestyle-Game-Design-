@@ -4,12 +4,12 @@ An experimental game-design repository for rapidly turning ideas into playable p
 
 This project is intentionally open-ended. It may become one game, several experiments, or a place to test unusual mechanics before deciding what deserves deeper development.
 
-## Current playable slice — Energy Relay 0.19
+## Current playable slice — Energy Relay 0.20
 
 - The player remains permanently in the blue energy-orb state; there is no human reform state.
 - Movement is now true zero-gravity/inertial motion: the orb has no constant downward acceleration. It keeps its current velocity until a redirect, collision or damping event changes it.
 - The run progresses from the bottom of the screen upward through a narrow space corridor with continuous left and right walls plus a solid rebound wall closing the starting end.
-- Every active gameplay touch enters 20% slow motion, including the very first launch aim. Drag in the direction of travel and release to launch or redirect the same orb.
+- Every active gameplay touch enters 40% slow motion, including the very first launch aim. Drag in the direction of travel and release to launch or redirect the same orb.
 - Side-wall, bottom-cap and moving-platform contacts bounce the orb. Restitution and tangential damping bleed momentum, and a sufficiently low-speed impact settles the orb for another launch.
 - Environmental spike hazards have been removed. Persistent wall-mounted laser emitters keep the slower on/off cadence, each active beam travels across the corridor over 1.8 seconds, and the beam visibly flickers during its final 0.7 seconds before shutting off.
 - The orb has seven lives. A lethal hit respawns at the latest checkpoint with short invulnerability; losing the seventh life automatically starts a fresh run.
