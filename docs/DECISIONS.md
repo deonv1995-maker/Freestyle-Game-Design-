@@ -243,3 +243,9 @@ Decision: drones use a centralized `DRONE_CONFIG.preFireWarningDuration` of 0.6 
 Decision: if a drone becomes ready while the orb is out of range, or while the global projectile cap blocks firing, its cooldown is held at the warning boundary rather than allowed to expire. Once firing becomes possible, the full warning window must elapse before a projectile can launch. After firing, warning state resets with the normal fire interval.
 
 Reason: the visual indicator must be mechanically trustworthy. The player should never be snap-shot by a drone that had no visible pre-fire cue, and the renderer should not maintain a separate timer that can drift from authoritative projectile logic.
+
+## 2026-09-27 — Touch slow motion reduced to half strength
+
+Decision: the shared gameplay slow-motion scale used while any gameplay touch is held is increased from `0.2` to `0.4`. This means the world now advances at 40% of normal speed during aiming/redirection instead of 20%, reducing the strength of the slow-motion effect by half while preserving the same single authoritative gameplay clock.
+
+Reason: touch aiming should still create a planning window, but the previous slowdown was too strong. Keeping the change in `GAME_CONFIG.touchTimeScale` preserves synchronization across orb motion, lasers, drone warnings, projectiles, effects, and timers.
