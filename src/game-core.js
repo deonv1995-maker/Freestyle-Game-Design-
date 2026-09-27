@@ -24,6 +24,13 @@ export const WORLD_CONFIG = Object.freeze({
   chunksAhead: 4
 });
 
+export const CITY_CONFIG = Object.freeze({
+  minTowerHeight: 1120,
+  maxTowerHeight: 1540,
+  difficultyTowerGrowth: 180,
+  platformDifficultyLift: 110
+});
+
 export const NPC_CONFIG = Object.freeze({
   width: 28,
   height: 56,
@@ -101,45 +108,157 @@ export const STARTER_SURFACES = Object.freeze([
   Object.freeze({
     id: "starter-ground",
     type: "ground",
+    visual: "cityDeck",
     x: -1800,
     y: GROUND_TOP,
     width: WORLD_CONFIG.proceduralStartX + 1800,
     height: WORLD_CONFIG.groundDepth
   }),
-  Object.freeze({ id: "platform-a", type: "platform", x: 70, y: 88, width: 170, height: 24 }),
-  Object.freeze({ id: "wall-a", type: "obstacle", x: 340, y: 18, width: 52, height: 162 }),
-  Object.freeze({ id: "platform-b", type: "platform", x: 500, y: -54, width: 220, height: 26 }),
-  Object.freeze({ id: "pillar-b", type: "obstacle", x: 790, y: 60, width: 56, height: 120 }),
-  Object.freeze({ id: "platform-c", type: "platform", x: 900, y: 22, width: 200, height: 24 }),
-  Object.freeze({ id: "platform-d", type: "platform", x: 1150, y: -112, width: 240, height: 24 }),
-  Object.freeze({ id: "block-d", type: "obstacle", x: 1450, y: 32, width: 112, height: 148 })
+  Object.freeze({
+    id: "platform-a",
+    type: "platform",
+    visual: "hoverCar",
+    x: 70,
+    y: 88,
+    width: 180,
+    height: 28
+  }),
+  Object.freeze({
+    id: "wall-a",
+    type: "obstacle",
+    visual: "tower",
+    x: 340,
+    y: GROUND_TOP - 1180,
+    width: 118,
+    height: 1180
+  }),
+  Object.freeze({
+    id: "platform-b",
+    type: "platform",
+    visual: "landingPad",
+    x: 510,
+    y: -330,
+    width: 230,
+    height: 30
+  }),
+  Object.freeze({
+    id: "pillar-b",
+    type: "obstacle",
+    visual: "spire",
+    x: 790,
+    y: GROUND_TOP - 1240,
+    width: 92,
+    height: 1240
+  }),
+  Object.freeze({
+    id: "platform-c",
+    type: "platform",
+    visual: "roofDeck",
+    x: 925,
+    y: -210,
+    width: 220,
+    height: 30
+  }),
+  Object.freeze({
+    id: "platform-d",
+    type: "platform",
+    visual: "hoverCar",
+    x: 1190,
+    y: -520,
+    width: 210,
+    height: 30
+  }),
+  Object.freeze({
+    id: "block-d",
+    type: "obstacle",
+    visual: "tower",
+    x: 1460,
+    y: GROUND_TOP - 1360,
+    width: 126,
+    height: 1360
+  })
 ]);
 
 const CHUNK_PATTERNS = Object.freeze([
   Object.freeze([
-    Object.freeze({ type: "platform", x: 90, y: 88, width: 180, height: 24 }),
-    Object.freeze({ type: "obstacle", x: 340, width: 52, height: 128 }),
-    Object.freeze({ type: "platform", x: 465, y: -8, width: 205, height: 26 }),
-    Object.freeze({ type: "obstacle", x: 735, width: 48, height: 92 })
+    Object.freeze({
+      type: "platform",
+      visual: "landingPad",
+      x: 72,
+      y: -170,
+      width: 190,
+      height: 30
+    }),
+    Object.freeze({ type: "obstacle", visual: "tower", x: 320, width: 116, height: 1180 }),
+    Object.freeze({
+      type: "platform",
+      visual: "hoverCar",
+      x: 488,
+      y: -520,
+      width: 175,
+      height: 28
+    }),
+    Object.freeze({ type: "obstacle", visual: "spire", x: 716, width: 94, height: 1260 })
   ]),
   Object.freeze([
-    Object.freeze({ type: "obstacle", x: 125, width: 66, height: 96 }),
-    Object.freeze({ type: "platform", x: 265, y: 54, width: 185, height: 24 }),
-    Object.freeze({ type: "obstacle", x: 515, width: 54, height: 148 }),
-    Object.freeze({ type: "platform", x: 610, y: -48, width: 175, height: 26 })
+    Object.freeze({ type: "obstacle", visual: "spire", x: 92, width: 96, height: 1160 }),
+    Object.freeze({
+      type: "platform",
+      visual: "roofDeck",
+      x: 235,
+      y: -360,
+      width: 190,
+      height: 30
+    }),
+    Object.freeze({ type: "obstacle", visual: "tower", x: 478, width: 128, height: 1320 }),
+    Object.freeze({
+      type: "platform",
+      visual: "hoverCar",
+      x: 628,
+      y: -610,
+      width: 158,
+      height: 28
+    })
   ]),
   Object.freeze([
-    Object.freeze({ type: "platform", x: 72, y: 36, width: 168, height: 24 }),
-    Object.freeze({ type: "obstacle", x: 300, width: 50, height: 158 }),
-    Object.freeze({ type: "platform", x: 405, y: 98, width: 150, height: 24 }),
-    Object.freeze({ type: "obstacle", x: 605, width: 48, height: 112 }),
-    Object.freeze({ type: "platform", x: 675, y: 4, width: 118, height: 24 })
+    Object.freeze({
+      type: "platform",
+      visual: "hoverCar",
+      x: 58,
+      y: -260,
+      width: 166,
+      height: 28
+    }),
+    Object.freeze({ type: "obstacle", visual: "tower", x: 272, width: 122, height: 1240 }),
+    Object.freeze({
+      type: "platform",
+      visual: "landingPad",
+      x: 438,
+      y: -470,
+      width: 168,
+      height: 30
+    }),
+    Object.freeze({ type: "obstacle", visual: "spire", x: 650, width: 102, height: 1380 })
   ]),
   Object.freeze([
-    Object.freeze({ type: "obstacle", x: 92, width: 52, height: 122 }),
-    Object.freeze({ type: "platform", x: 210, y: 6, width: 205, height: 26 }),
-    Object.freeze({ type: "platform", x: 470, y: 82, width: 150, height: 24 }),
-    Object.freeze({ type: "obstacle", x: 668, width: 58, height: 166 })
+    Object.freeze({ type: "obstacle", visual: "tower", x: 78, width: 120, height: 1200 }),
+    Object.freeze({
+      type: "platform",
+      visual: "landingPad",
+      x: 242,
+      y: -430,
+      width: 188,
+      height: 30
+    }),
+    Object.freeze({
+      type: "platform",
+      visual: "hoverCar",
+      x: 486,
+      y: -650,
+      width: 152,
+      height: 28
+    }),
+    Object.freeze({ type: "obstacle", visual: "tower", x: 680, width: 128, height: 1460 })
   ])
 ]);
 
@@ -470,6 +589,7 @@ export function generateWorldChunk(chunkIndex) {
       y: GROUND_TOP,
       width: WORLD_CONFIG.chunkWidth,
       height: WORLD_CONFIG.groundDepth,
+      visual: "cityDeck",
       chunkIndex: safeIndex
     }
   ];
@@ -482,7 +602,7 @@ export function generateWorldChunk(chunkIndex) {
     const heightVariation = Math.round((seededUnit(safeIndex, elementIndex + 1) - 0.5) * 34);
 
     if (element.type === "platform") {
-      const difficultyLift = Math.round(difficulty * 30);
+      const difficultyLift = Math.round(difficulty * CITY_CONFIG.platformDifficultyLift);
       surfaces.push({
         id: `chunk-${safeIndex}-platform-${platformNumber}`,
         type: "platform",
@@ -490,20 +610,25 @@ export function generateWorldChunk(chunkIndex) {
         y: element.y + heightVariation - difficultyLift,
         width: element.width,
         height: element.height,
+        visual: element.visual || "landingPad",
         chunkIndex: safeIndex
       });
       platformNumber += 1;
       continue;
     }
 
-    const obstacleHeight = Math.max(
-      72,
-      element.height + Math.round(heightVariation * 0.5) + Math.round(difficulty * 24)
+    const obstacleHeight = clamp(
+      element.height +
+        Math.round(heightVariation * 0.5) +
+        Math.round(difficulty * CITY_CONFIG.difficultyTowerGrowth),
+      CITY_CONFIG.minTowerHeight,
+      CITY_CONFIG.maxTowerHeight
     );
 
     surfaces.push({
       id: `chunk-${safeIndex}-obstacle-${obstacleNumber}`,
       type: "obstacle",
+      visual: element.visual || "tower",
       x: chunkX + element.x,
       y: GROUND_TOP - obstacleHeight,
       width: element.width,
