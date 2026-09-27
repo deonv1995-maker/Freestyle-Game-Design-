@@ -6,11 +6,9 @@ import {
   NPC_CONFIG,
   STARTER_SURFACES,
   WORLD_CONFIG,
-  beginSlingshot,
-  beginSteering,
-  cancelSlingshot,
+  beginAim,
+  cancelAim,
   createGameState,
-  endSteering,
   findEarliestNpcCollision,
   findEarliestSurfaceCollision,
   generateNpcChunk,
@@ -19,10 +17,9 @@ import {
   getWorldNpcs,
   getWorldSurfaces,
   refreshWorldForFocus,
-  releaseSlingshot,
+  releaseAim,
   stepGame,
-  updateSlingshot,
-  updateSteering
+  updateAim
 } from "../src/game-core.js";
 
 test("new run starts in human form with an inactive orb", () => {
@@ -34,11 +31,11 @@ test("new run starts in human form with an inactive orb", () => {
   assert.equal(state.score.npcHits, 0);
 });
 
-test("left-side slingshot pull aims opposite the draw direction", () => {
+test("direct drag aims the orb in the same direction as the gesture", () => {
   const state = createGameState();
 
-  assert.equal(beginSlingshot(state, 180, 220, 7), true);
-  updateSlingshot(state, 80, 280, 7);
+  assert.equal(beginAim(state, 100, 100, 7), true);
+  assert.equal(updateAim(state, 220, 40, 7), true);
 
   const aim = getLaunchVector(state);
   assert.ok(aim.x > 0);
@@ -46,16 +43,16 @@ test("left-side slingshot pull aims opposite the draw direction", () => {
   assert.ok(aim.power > 0);
 });
 
-test("slingshot draw distance controls launch speed within configured bounds", () => {
+test("drag distance controls launch speed within configured bounds", () => {
   const weak = createGameState();
-  beginSlingshot(weak, 180, 180, 1);
-  updateSlingshot(weak, 140, 190, 1);
-  assert.equal(releaseSlingshot(weak, 1), true);
+  beginAim(weak, 0, 0, 1);
+  updateAim(weak, 40, 0, 1);
+  releaseAim(weak, 1);
 
   const strong = createGameState();
-  beginSlingshot(strong, 180, 180, 2);
-  updateSlingshot(strong, -200, 320, 2);
-  assert.equal(releaseSlingshot(strong, 2), true);
+  beginAim(strong, 0, 0, 2);
+  updateAim(strong, GAME_CONFIG.maxAimDistance * 2, 0, 2);
+  releaseAim(strong, 2);
 
   const weakSpeed = Math.hypot(weak.orb.vx, weak.orb.vy);
   const strongSpeed = Math.hypot(strong.orb.vx, strong.orb.vy);
@@ -65,74 +62,122 @@ test("slingshot draw distance controls launch speed within configured bounds", (
   assert.ok(strongSpeed <= GAME_CONFIG.maxLaunchSpeed + 0.001);
 });
 
-test("releasing without a meaningful pull cancels instead of launching", () => {
+test("a short tap reuses the previous aim rather than creating zero velocity", () => {
   const state = createGameState();
 
-  beginSlingshot(state, 100, 100, 3);
-  updateSlingshot(state, 105, 104, 3);
+  beginAim(state, 40, 40, 3);
+  assert.equal(releaseAim(state, 3), true);
 
-  assert.equal(releaseSlingshot(state, 3), false);
-  assert.equal(state.mode, "ready");
-  assert.equal(state.orb.active, false);
-  assert.equal(state.burstCount, 0);
+  assert.equal(state.mode, "orb");
+  assert.ok(Math.hypot(state.orb.vx, state.orb.vy) >= GAME_CONFIG.minLaunchSpeed);
 });
 
-test("cancelled touch gesture safely returns to ready state", () => {
+test("cancelled aim safely returns to ready state", () => {
   const state = createGameState();
 
-  beginSlingshot(state, 100, 100, 4);
-  updateSlingshot(state, 40, 130, 4);
+  beginAim(state, 100, 100, 4);
+  updateAim(state, 160, 80, 4);
 
-  assert.equal(cancelSlingshot(state, 4), true);
+  assert.equal(cancelAim(state, 4), true);
   assert.equal(state.mode, "ready");
   assert.equal(state.launch.pointerId, null);
 });
 
-test("launch transforms the player into the moving energy orb", () => {
+test("launch transforms the player into the same blue energy-orb gameplay state", () => {
   const state = createGameState();
 
-  beginSlingshot(state, 180, 200, 5);
-  updateSlingshot(state, 80, 240, 5);
-  assert.equal(releaseSlingshot(state, 5), true);
+  beginAim(state, 100, 100, 5);
+  updateAim(state, 210, 45, 5);
+  assert.equal(releaseAim(state, 5), true);
 
   assert.equal(state.mode, "orb");
   assert.equal(state.orb.active, true);
   assert.equal(state.burstCount, 1);
-  assert.ok(Math.hypot(state.orb.vx, state.orb.vy) >= GAME_CONFIG.minLaunchSpeed);
   assert.equal(state.animation.transformPulse, 1);
 });
 
-test("right-side steering bends orb velocity while orb form is active", () => {
+test("orb radius participates in swept world collision", () => {
+  const state = createGameState();
+  const hit = findEarliestSurfaceCollision(
+    state,
+    300,
+    100,
+    350,
+    100,
+    GAME_CONFIG.orbRadius
+  );
+
+  assert.ok(hit);
+  assert.equal(hit.surface.id, "wall-a");
+  assert.equal(hit.normalX, -1);
+  assert.equal(hit.x, 340 - GAME_CONFIG.orbRadius);
+});
+
+test("side impact with a wall bounces instead of reforming the character", () => {
   const state = createGameState();
 
-  beginSlingshot(state, 180, 200, 6);
-  updateSlingshot(state, 80, 200, 6);
-  releaseSlingshot(state, 6);
-
-  const initialVy = state.orb.vy;
-  assert.equal(beginSteering(state, 800, 250, 9), true);
-  assert.equal(updateSteering(state, 800, 120, 9), true);
+  state.mode = "orb";
+  state.orb.active = true;
+  state.orb.x = 300;
+  state.orb.y = 100;
+  state.orb.vx = 700;
+  state.orb.vy = 0;
 
   stepGame(state, 0.05);
 
-  assert.ok(state.orb.vy < initialVy + GAME_CONFIG.orbGravity * 0.05);
-  assert.ok(state.steering.strength > 0);
-  assert.equal(endSteering(state, 9), true);
-  assert.equal(state.steering.pointerId, null);
+  assert.equal(state.mode, "orb");
+  assert.equal(state.orb.active, true);
+  assert.ok(state.orb.vx < 0);
+  assert.equal(state.orb.lastBounce.surfaceId, "wall-a");
+  assert.equal(state.orb.lastBounce.normalX, -1);
+  assert.ok(state.animation.bouncePulse > 0);
 });
 
-test("steering cannot begin while the player is in human form", () => {
+test("underside impact with a platform bounces downward instead of sticking", () => {
   const state = createGameState();
-  assert.equal(beginSteering(state, 700, 200, 1), false);
+
+  state.mode = "orb";
+  state.orb.active = true;
+  state.orb.x = 150;
+  state.orb.y = 150;
+  state.orb.vx = 0;
+  state.orb.vy = -650;
+
+  stepGame(state, 0.05);
+
+  assert.equal(state.mode, "orb");
+  assert.equal(state.orb.active, true);
+  assert.ok(state.orb.vy > 0);
+  assert.equal(state.orb.lastBounce.surfaceId, "platform-a");
+  assert.equal(state.orb.lastBounce.normalY, 1);
 });
 
-test("orb impact with the ground reforms the player at the exact contact", () => {
+test("top of an obstacle is not standable and bounces the orb", () => {
+  const state = createGameState();
+
+  state.mode = "orb";
+  state.orb.active = true;
+  state.orb.x = 366;
+  state.orb.y = -12;
+  state.orb.vx = 0;
+  state.orb.vy = 420;
+
+  stepGame(state, 0.05);
+
+  assert.equal(state.mode, "orb");
+  assert.equal(state.orb.active, true);
+  assert.ok(state.orb.vy < 0);
+  assert.equal(state.orb.lastBounce.surfaceId, "wall-a");
+  assert.equal(state.orb.lastBounce.normalY, -1);
+});
+
+test("top landing on ground reforms the player standing on the floor", () => {
   const state = createGameState();
 
   state.mode = "orb";
   state.orb.active = true;
   state.orb.x = 0;
-  state.orb.y = 120;
+  state.orb.y = 130;
   state.orb.vx = 0;
   state.orb.vy = 600;
 
@@ -142,11 +187,29 @@ test("orb impact with the ground reforms the player at the exact contact", () =>
 
   assert.equal(state.mode, "ready");
   assert.equal(state.orb.active, false);
-  assert.equal(state.orb.y, WORLD_CONFIG.groundTop);
+  assert.equal(state.orb.y, WORLD_CONFIG.groundTop - GAME_CONFIG.orbRadius);
   assert.equal(state.player.x, state.orb.x);
-  assert.equal(state.player.y, state.orb.y);
+  assert.equal(state.player.y, WORLD_CONFIG.groundTop);
   assert.equal(state.orb.contact.surfaceId, "starter-ground");
   assert.ok(state.animation.reformPulse > 0);
+});
+
+test("top landing on a platform reforms the player on the platform top", () => {
+  const state = createGameState();
+
+  state.mode = "orb";
+  state.orb.active = true;
+  state.orb.x = 150;
+  state.orb.y = 55;
+  state.orb.vx = 0;
+  state.orb.vy = 420;
+
+  stepGame(state, 0.05);
+
+  assert.equal(state.mode, "ready");
+  assert.equal(state.orb.active, false);
+  assert.equal(state.orb.contact.surfaceId, "platform-a");
+  assert.equal(state.player.y, 88);
 });
 
 test("orb collision knocks an NPC down and counts the hit once", () => {
@@ -219,16 +282,6 @@ test("active world surfaces remain unique valid rectangles", () => {
     assert.equal(ids.has(surface.id), false);
     ids.add(surface.id);
   }
-});
-
-test("swept collision still catches a fast crossing of a thin obstacle", () => {
-  const state = createGameState();
-  const hit = findEarliestSurfaceCollision(state, 300, 100, 430, 100);
-
-  assert.ok(hit);
-  assert.equal(hit.surface.id, "wall-a");
-  assert.equal(hit.x, 340);
-  assert.equal(hit.normalX, -1);
 });
 
 test("procedural chunks remain deterministic and their ground joins without gaps", () => {
