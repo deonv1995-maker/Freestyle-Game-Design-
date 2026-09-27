@@ -1,0 +1,88 @@
+name: Build Android APK
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "android/**"
+      - "src/**"
+      - "assets/**"
+      - "tests/**"
+      - "scripts/**"
+      - "index.html"
+      - "site.webmanifest"
+      - "package.json"
+      - ".github/workflows/build-android-apk.yml"
+  pull_request:
+    paths:
+      - "android/**"
+      - "src/**"
+      - "assets/**"
+      - "tests/**"
+      - "scripts/**"
+      - "index.html"
+      - "site.webmanifest"
+      - "package.json"
+      - ".github/workflows/build-android-apk.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: android-test-apk-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          package-manager-cache: false
+
+      - name: Verify and build game
+        run: npm run check
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: android-actions/setup-android@v4
+
+      - name: Install Android SDK
+        run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+
+      - uses: gradle/actions/setup-gradle@v6
+        with:
+          gradle-version: "8.9"
+          cache-provider: basic
+
+      - name: Build installable APK
+        run: gradle --no-daemon -p android :app:assembleDebug
+
+      - name: Verify APK identity
+        run: |
+          APK="android/app/build/outputs/apk/debug/app-debug.apk"
+          test -f "$APK"
+          test "$(apkanalyzer manifest application-id "$APK")" = "com.freestylegamedesign.spearrelay"
+          mkdir -p release
+          cp "$APK" release/Spear-Relay.apk
+
+      - uses: actions/upload-artifact@v6
+        with:
+          name: Spear-Relay-Android-Test
+          path: release/Spear-Relay.apk
+          if-no-files-found: error
+
+      - name: Publish phone-download release
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="android-test-${GITHUB_RUN_NUMBER}"
+          gh release create "$TAG" release/Spear-Relay.apk             --target "$GITHUB_SHA"             --title "Spear Relay Android Test #${GITHUB_RUN_NUMBER}"             --notes "Installable Android test build generated from commit $GITHUB_SHA."
