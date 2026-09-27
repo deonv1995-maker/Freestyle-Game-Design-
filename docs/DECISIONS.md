@@ -81,3 +81,13 @@ Only a bounded window of procedural chunks around the current player/spear focus
 Player progress is recorded when the relay actually moves the player forward; spear flight may stream geometry ahead so collision remains available before the player arrives.
 
 Reason: the course should continue indefinitely as the player advances without duplicating geometry systems, introducing random impossible seams, or allowing memory use to grow forever.
+
+## 2026-09-27 — Prototype 0.4 adds throw animation and airborne bullet-time presentation
+
+Decision: relaying to a spear while it is still in flight enters an airborne aiming presentation state. The existing relay input contract still stops the active spear flight immediately, so the slow-motion look does not introduce a second gameplay physics timescale or alter deterministic throw/collision behavior.
+
+The gameplay state owns only the minimal animation descriptors needed across frames: airborne aim, persistent airborne player pose, visual animation clocks, throw direction and normalized follow-through. Rendering owns the stick-figure pose, recoil, tucked legs, slow float, vignette/rings and precision reticle.
+
+Grounded aiming keeps the normal presentation. Releasing any aim starts a short throw follow-through. Releasing from airborne aim preserves the airborne body pose until the next relay changes the player's placement context.
+
+Reason: throwing should read as a physical action, and mid-air aiming should feel like hang-time/bullet-time without destabilizing the procedural world, touch controls, spear physics, collision or camera systems.
