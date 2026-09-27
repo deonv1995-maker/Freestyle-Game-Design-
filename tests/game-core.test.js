@@ -113,38 +113,48 @@ test("cancelled aim returns the resting orb to ready", () => {
   assert.equal(state.orb.active, true);
 });
 
-test("pressing during orb flight freezes world gameplay for re-aiming", () => {
-  const state = createGameState();
-  const drone = getWorldDrones(state)[0];
+test("pressing during orb flight slows gameplay instead of freezing it", () => {
+  const slow = createGameState();
+  const normal = createGameState();
 
-  state.mode = "orb";
-  state.orb.x = 0;
-  state.orb.y = 420;
-  state.orb.vx = 120;
-  state.orb.vy = -520;
+  for (const state of [slow, normal]) {
+    state.mode = "orb";
+    state.orb.x = 0;
+    state.orb.y = 500;
+    state.orb.vx = 120;
+    state.orb.vy = -520;
+    state.orb.invulnerability = 5;
+  }
 
-  const orbX = state.orb.x;
-  const orbY = state.orb.y;
-  const orbVx = state.orb.vx;
-  const orbVy = state.orb.vy;
-  const worldClock = state.world.clock;
-  const droneX = drone.x;
-  const droneY = drone.y;
-  const projectileCount = getWorldProjectiles(state).length;
+  assert.equal(beginAim(slow, 400, 220, 21), true);
+  assert.equal(slow.mode, "airAiming");
 
-  assert.equal(beginAim(state, 400, 220, 21), true);
-  assert.equal(state.mode, "airAiming");
+  stepGame(slow, 0.05);
+  stepGame(normal, 0.05);
 
-  stepGame(state, 0.05);
+  assert.equal(
+    slow.world.clock,
+    0.05 * GAME_CONFIG.airAimTimeScale
+  );
+  assert.equal(normal.world.clock, 0.05);
 
-  assert.equal(state.orb.x, orbX);
-  assert.equal(state.orb.y, orbY);
-  assert.equal(state.orb.vx, orbVx);
-  assert.equal(state.orb.vy, orbVy);
-  assert.equal(state.world.clock, worldClock);
-  assert.equal(drone.x, droneX);
-  assert.equal(drone.y, droneY);
-  assert.equal(getWorldProjectiles(state).length, projectileCount);
+  const slowDx = slow.orb.x;
+  const slowDy = 500 - slow.orb.y;
+  const normalDx = normal.orb.x;
+  const normalDy = 500 - normal.orb.y;
+
+  assert.ok(slowDx > 0);
+  assert.ok(slowDy > 0);
+  assert.ok(normalDx > slowDx);
+  assert.ok(normalDy > slowDy);
+  assert.ok(
+    Math.abs(slowDx / normalDx - GAME_CONFIG.airAimTimeScale) < 1e-9
+  );
+  assert.ok(
+    Math.abs(slowDy / normalDy - GAME_CONFIG.airAimTimeScale) < 1e-9
+  );
+  assert.equal(slow.orb.vx, normal.orb.vx);
+  assert.equal(slow.orb.vy, normal.orb.vy);
 });
 
 test("midair re-aim redirects the same orb without creating a new burst", () => {
@@ -244,21 +254,69 @@ test("starter course and generated chunks contain lasers and wall spikes", () =>
   assert.equal(types.has("rightSpikes"), true);
 });
 
-test("horizontal lasers move vertically and cycle between active and inactive states", () => {
+test("wall-mounted lasers stay fixed, persist, and cycle their beam on and off", () => {
   const state = createGameState();
-  const laser = getWorldHazards(state).find((hazard) => hazard.type === "laser");
+  state.orb.invulnerability = 10;
 
+  const laser = getWorldHazards(state).find((hazard) => hazard.type === "laser");
   const startY = laser.y;
+  const startX = laser.x;
+  const startWidth = laser.width;
   const seenStates = new Set([laser.active]);
+
+  assert.equal(laser.motion, undefined);
+  assert.ok(["left", "right"].includes(laser.laser.sourceSide));
+  assert.equal(
+    laser.x,
+    WORLD_CONFIG.corridorLeft + HAZARD_CONFIG.laserWallInset
+  );
+  assert.equal(
+    laser.width,
+    WORLD_CONFIG.corridorRight -
+      WORLD_CONFIG.corridorLeft -
+      HAZARD_CONFIG.laserWallInset * 2
+  );
 
   for (let i = 0; i < 90; i += 1) {
     stepGame(state, 0.05);
     seenStates.add(laser.active);
+
+    assert.equal(
+      getWorldHazards(state).some((hazard) => hazard.id === laser.id),
+      true
+    );
   }
 
-  assert.notEqual(laser.y, startY);
+  assert.equal(laser.x, startX);
+  assert.equal(laser.y, startY);
+  assert.equal(laser.width, startWidth);
   assert.equal(seenStates.has(true), true);
   assert.equal(seenStates.has(false), true);
+});
+
+test("all generated lasers span the corridor from persistent wall emitters", () => {
+  for (let chunkIndex = 0; chunkIndex < 10; chunkIndex += 1) {
+    const lasers = generateHazardChunk(chunkIndex).filter(
+      (hazard) => hazard.type === "laser"
+    );
+
+    assert.ok(lasers.length >= 1);
+
+    for (const laser of lasers) {
+      assert.equal(laser.motion, undefined);
+      assert.ok(["left", "right"].includes(laser.laser.sourceSide));
+      assert.equal(
+        laser.x,
+        WORLD_CONFIG.corridorLeft + HAZARD_CONFIG.laserWallInset
+      );
+      assert.equal(
+        laser.width,
+        WORLD_CONFIG.corridorRight -
+          WORLD_CONFIG.corridorLeft -
+          HAZARD_CONFIG.laserWallInset * 2
+      );
+    }
+  }
 });
 
 test("swept hazard collision detects a wall spike field before tunneling through it", () => {
@@ -507,6 +565,8 @@ test("camera remains zoomed out for mobile vertical traversal visibility", () =>
 
 test("configured space-corridor values remain physically valid", () => {
   assert.equal(GAME_CONFIG.orbGravity, 0);
+  assert.ok(GAME_CONFIG.airAimTimeScale > 0);
+  assert.ok(GAME_CONFIG.airAimTimeScale < 1);
   assert.ok(HAZARD_CONFIG.laserMinimumCycle > 0);
   assert.ok(HAZARD_CONFIG.laserMaxActiveRatio < 1);
   assert.ok(WORLD_CONFIG.corridorLeft < WORLD_CONFIG.corridorRight);
