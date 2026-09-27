@@ -194,21 +194,44 @@ function drawAimGuide() {
   const guideLength = 90 + aim.power * 100;
   const endX = origin.x + aim.x * guideLength;
   const endY = origin.y + aim.y * guideLength;
+  const airborne = state.animation.airborneAim;
+  const guideColor = airborne
+    ? "rgba(121, 209, 255, 0.86)"
+    : "rgba(255, 213, 106, 0.72)";
+  const solidGuideColor = airborne
+    ? "rgba(156, 224, 255, 0.98)"
+    : "rgba(255, 213, 106, 0.95)";
 
   ctx.save();
-  ctx.setLineDash([8, 7]);
-  ctx.strokeStyle = "rgba(255, 213, 106, 0.72)";
-  ctx.lineWidth = 2;
+  ctx.setLineDash(airborne ? [5, 8] : [8, 7]);
+  ctx.strokeStyle = guideColor;
+  ctx.lineWidth = airborne ? 2.5 : 2;
   ctx.beginPath();
   ctx.moveTo(origin.x, origin.y);
   ctx.lineTo(endX, endY);
   ctx.stroke();
   ctx.setLineDash([]);
 
-  ctx.fillStyle = "rgba(255, 213, 106, 0.95)";
+  ctx.fillStyle = solidGuideColor;
   ctx.beginPath();
   ctx.arc(endX, endY, 4 + aim.power * 3, 0, Math.PI * 2);
   ctx.fill();
+
+  if (airborne) {
+    ctx.strokeStyle = "rgba(156, 224, 255, 0.66)";
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(endX, endY, 13, 0, Math.PI * 2);
+    ctx.moveTo(endX - 19, endY);
+    ctx.lineTo(endX - 8, endY);
+    ctx.moveTo(endX + 8, endY);
+    ctx.lineTo(endX + 19, endY);
+    ctx.moveTo(endX, endY - 19);
+    ctx.lineTo(endX, endY - 8);
+    ctx.moveTo(endX, endY + 8);
+    ctx.lineTo(endX, endY + 19);
+    ctx.stroke();
+  }
 
   const barWidth = 90;
   const barX = origin.x - barWidth * 0.5;
@@ -216,7 +239,9 @@ function drawAimGuide() {
   ctx.fillStyle = "rgba(255,255,255,0.11)";
   roundRect(ctx, barX, barY, barWidth, 6, 3);
   ctx.fill();
-  ctx.fillStyle = "rgba(255,213,106,0.9)";
+  ctx.fillStyle = airborne
+    ? "rgba(121,209,255,0.92)"
+    : "rgba(255,213,106,0.9)";
   roundRect(ctx, barX, barY, barWidth * aim.power, 6, 3);
   ctx.fill();
   ctx.restore();
@@ -238,33 +263,191 @@ function drawTeleportPulse() {
   ctx.restore();
 }
 
-function drawPlayer() {
-  const p = worldToScreen(state.player.x, state.player.y);
+function drawSlowMotionEffect() {
+  if (!state.animation.airborneAim) return;
+
+  const focus = worldToScreen(state.player.x, state.player.y - 34);
+  const phase = reduceMotion ? 0.45 : state.animation.airborneAimClock;
 
   ctx.save();
-  ctx.translate(p.x, p.y);
+
+  ctx.fillStyle = "rgba(5, 11, 24, 0.2)";
+  ctx.fillRect(0, 0, viewportWidth, viewportHeight);
+
+  const vignette = ctx.createRadialGradient(
+    focus.x,
+    focus.y,
+    24,
+    focus.x,
+    focus.y,
+    Math.max(180, Math.min(viewportWidth, viewportHeight) * 0.72)
+  );
+  vignette.addColorStop(0, "rgba(121, 209, 255, 0.03)");
+  vignette.addColorStop(0.42, "rgba(54, 116, 170, 0.06)");
+  vignette.addColorStop(1, "rgba(2, 7, 17, 0.24)");
+  ctx.fillStyle = vignette;
+  ctx.fillRect(0, 0, viewportWidth, viewportHeight);
+
+  ctx.strokeStyle = "rgba(121, 209, 255, 0.15)";
+  ctx.lineWidth = 1.5;
+  for (let i = 0; i < 3; i += 1) {
+    const radius = 54 + i * 30 + mod(phase * 22, 24);
+    ctx.beginPath();
+    ctx.arc(focus.x, focus.y, radius, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  for (let i = 0; i < 8; i += 1) {
+    const angle = (Math.PI * 2 * i) / 8 + phase * 0.32;
+    const inner = 72 + (i % 2) * 9;
+    const outer = inner + 26;
+    ctx.beginPath();
+    ctx.moveTo(focus.x + Math.cos(angle) * inner, focus.y + Math.sin(angle) * inner);
+    ctx.lineTo(focus.x + Math.cos(angle) * outer, focus.y + Math.sin(angle) * outer);
+    ctx.stroke();
+  }
+
+  ctx.restore();
+}
+
+function drawPlayer() {
+  const p = worldToScreen(state.player.x, state.player.y);
+  const isAiming = state.mode === "aiming";
+  const isAirAim = state.animation.airborneAim;
+  const isAirborne = state.animation.playerAirborne;
+  const followThrough = state.animation.throwFollowThrough;
+  const throwProgress = followThrough > 0 ? 1 - followThrough : 1;
+  const throwSwing = followThrough > 0 ? Math.sin(throwProgress * Math.PI) : 0;
+  const aim = getAimVector(state);
+  const direction = isAiming
+    ? aim
+    : {
+        x: state.animation.throwDirectionX,
+        y: state.animation.throwDirectionY
+      };
+  const facing = direction.x < -0.05 ? -1 : 1;
+  const motionClock = isAirAim
+    ? state.animation.airborneAimClock
+    : state.animation.clock;
+  const floatOffset =
+    isAirborne && !reduceMotion ? Math.sin(motionClock * 3.2) * 2.2 : 0;
+  const recoil = followThrough > 0 ? throwSwing * 3.5 : 0;
+  const bodyLean = isAiming
+    ? Math.max(-4, Math.min(4, direction.x * 3.4))
+    : direction.x * throwSwing * 5;
+
+  const neck = { x: bodyLean * 0.5, y: -42 };
+  const hip = { x: -bodyLean * 0.18, y: -17 };
+  const shoulder = { x: neck.x + facing * 2, y: -36 };
+
+  let throwElbow;
+  let throwHand;
+
+  if (isAiming) {
+    throwElbow = {
+      x: shoulder.x - facing * 10 - direction.y * 4,
+      y: shoulder.y + 5 - direction.x * 3
+    };
+    throwHand = { x: 0, y: -34 };
+  } else if (followThrough > 0) {
+    const armLength = 22 + throwSwing * 9;
+    throwHand = {
+      x: shoulder.x + direction.x * armLength,
+      y: shoulder.y + direction.y * armLength
+    };
+    throwElbow = {
+      x: shoulder.x + direction.x * armLength * 0.48 - direction.y * 4,
+      y: shoulder.y + direction.y * armLength * 0.48 + direction.x * 4
+    };
+  } else {
+    throwElbow = { x: facing * 7, y: -31 };
+    throwHand = { x: facing * 12, y: -39 };
+  }
+
+  const offShoulder = { x: neck.x - facing * 2, y: -35 };
+  const offElbow = isAirAim
+    ? { x: -facing * 11, y: -28 }
+    : { x: -facing * 9 - direction.x * throwSwing * 4, y: -28 };
+  const offHand = isAirAim
+    ? { x: -facing * 16, y: -18 }
+    : { x: -facing * 14 - direction.x * throwSwing * 7, y: -22 };
+
+  let legA;
+  let legB;
+
+  if (isAirborne) {
+    const curl = reduceMotion ? 0.45 : (Math.sin(motionClock * 4) + 1) * 0.5;
+    legA = {
+      knee: { x: -facing * 9, y: -7 - curl * 4 },
+      foot: { x: -facing * 3, y: 1 - curl * 2 }
+    };
+    legB = {
+      knee: { x: facing * 9, y: -9 + curl * 3 },
+      foot: { x: facing * 16, y: -2 + curl * 2 }
+    };
+  } else {
+    const stride = throwSwing * 4;
+    legA = {
+      knee: { x: -facing * 6, y: -8 },
+      foot: { x: -facing * (11 + stride), y: 0 }
+    };
+    legB = {
+      knee: { x: facing * 7, y: -7 },
+      foot: { x: facing * (11 + stride), y: 0 }
+    };
+  }
+
+  ctx.save();
+  ctx.translate(
+    p.x - direction.x * recoil,
+    p.y + floatOffset - direction.y * recoil * 0.35
+  );
+
+  if (followThrough > 0) {
+    ctx.strokeStyle = `rgba(255, 213, 106, ${0.18 + throwSwing * 0.22})`;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(shoulder.x, shoulder.y, 25 + throwSwing * 7, -1.9, 0.45);
+    ctx.stroke();
+  }
 
   ctx.strokeStyle = "#eef3ff";
   ctx.fillStyle = "#eef3ff";
   ctx.lineWidth = 4;
   ctx.lineCap = "round";
+  ctx.lineJoin = "round";
 
   ctx.beginPath();
-  ctx.arc(0, -51, 8, 0, Math.PI * 2);
+  ctx.arc(neck.x + bodyLean * 0.18, -51, 8, 0, Math.PI * 2);
   ctx.fill();
 
   ctx.beginPath();
-  ctx.moveTo(0, -42);
-  ctx.lineTo(0, -17);
-  ctx.moveTo(0, -34);
-  ctx.lineTo(-13, -25);
-  ctx.moveTo(0, -33);
-  ctx.lineTo(12, -39);
-  ctx.moveTo(0, -17);
-  ctx.lineTo(-10, 0);
-  ctx.moveTo(0, -17);
-  ctx.lineTo(11, 0);
+  ctx.moveTo(neck.x, neck.y);
+  ctx.lineTo(hip.x, hip.y);
+
+  ctx.moveTo(shoulder.x, shoulder.y);
+  ctx.lineTo(throwElbow.x, throwElbow.y);
+  ctx.lineTo(throwHand.x, throwHand.y);
+
+  ctx.moveTo(offShoulder.x, offShoulder.y);
+  ctx.lineTo(offElbow.x, offElbow.y);
+  ctx.lineTo(offHand.x, offHand.y);
+
+  ctx.moveTo(hip.x, hip.y);
+  ctx.lineTo(legA.knee.x, legA.knee.y);
+  ctx.lineTo(legA.foot.x, legA.foot.y);
+
+  ctx.moveTo(hip.x, hip.y);
+  ctx.lineTo(legB.knee.x, legB.knee.y);
+  ctx.lineTo(legB.foot.x, legB.foot.y);
   ctx.stroke();
+
+  if (isAirAim) {
+    ctx.fillStyle = "rgba(121, 209, 255, 0.9)";
+    ctx.beginPath();
+    ctx.arc(throwHand.x, throwHand.y, 3.2, 0, Math.PI * 2);
+    ctx.fill();
+  }
 
   ctx.restore();
 }
@@ -310,6 +493,7 @@ function render() {
   drawBackground();
   drawWorldSurfaces();
   drawTrail();
+  drawSlowMotionEffect();
   drawAimGuide();
   drawTeleportPulse();
   drawPlayer();
@@ -330,8 +514,13 @@ function updateHud() {
   }
 
   if (state.mode === "aiming") {
-    statusNode.textContent = "AIMING";
-    hintNode.textContent = "Slide in the throw direction. Release your finger to launch.";
+    if (state.animation.airborneAim) {
+      statusNode.textContent = "AIR AIM · SLOW MOTION";
+      hintNode.textContent = "Hang time is slowed for aiming. Slide to line up the throw, then release.";
+    } else {
+      statusNode.textContent = "AIMING";
+      hintNode.textContent = "Slide in the throw direction. Release your finger to launch.";
+    }
     return;
   }
 
