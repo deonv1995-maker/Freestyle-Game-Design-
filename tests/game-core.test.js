@@ -413,14 +413,16 @@ test("orb contact destroys a drone without costing a life", () => {
   );
   const startingLives = state.lives;
 
+  // Keep the contact path in the starter area's open center so the
+  // drone-contact rule is isolated from generated platforms and hazards.
   drone.x = 0;
-  drone.y = -100;
+  drone.y = 100;
   drone.homeX = drone.x;
   drone.homeY = drone.y;
 
   state.mode = "orb";
   state.orb.x = -62;
-  state.orb.y = -100;
+  state.orb.y = 100;
   state.orb.vx = 900;
   state.orb.vy = 0;
   state.orb.invulnerability = 2;
