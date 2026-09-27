@@ -113,3 +113,16 @@ Decision: a spear collision with solid world geometry now immediately moves the 
 NPC hits retain a short physical reaction instead of disappearing instantly. A hit NPC is marked defeated immediately, inherits spear momentum, tumbles through the air, enters a brief fallen pose on ground contact, fades, and is then removed from the active NPC collection. Defeated IDs are retained only for the currently streamed definition window and pruned as chunks leave that window, keeping the endless-run state bounded.
 
 Reason: impact should feel immediate and readable while removing an extra relay input after terrain contact, and NPC targets should visibly react to a successful spear hit before leaving the scene without becoming permanent runtime objects.
+
+
+## 2026-09-27 — Prototype 0.7 replaces the spear with an energy transformation and split controls
+
+Decision: the spear entity and throw/relay input contract are replaced by a player-owned energy-orb transformation. In normal form the player is visible and stationary at the current world position. Releasing a valid launch gesture transforms the player into the orb; while orb form is active, the normal player body is not rendered because the orb is the player.
+
+The screen is divided by responsibility rather than by duplicated movement systems. The left half is the initiation zone. Pressing there begins a slingshot draw: dragging away from the initial touch point stores power, and the launch direction is the inverse of that pull vector. Releasing below the deadzone cancels safely; releasing a valid draw launches the orb. The right half is the control zone while orb form is active. A hold-drag gesture behaves as a bounded virtual joystick that applies steering acceleration without replacing the orb's existing momentum.
+
+The orb uses the existing deterministic world collision and bounded streamed NPC/world data. NPC contact transfers orb momentum into the existing knockdown/fall/despawn lifecycle and increments the run hit counter. Solid-world contact ends orb form and reforms the player at the orb's exact impact position.
+
+Gameplay physics and input state remain in `game-core.js`; split-screen gesture routing, slingshot/joystick presentation, blue energy rendering and HUD copy remain in `game.js`.
+
+Reason: the mechanic should read as a superpower rather than a projectile tool while preserving the successful traversal architecture, mobile-first two-thumb ergonomics, deterministic collision, bounded streaming and one authoritative gameplay simulation.

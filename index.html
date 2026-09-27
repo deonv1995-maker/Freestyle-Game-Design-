@@ -7,24 +7,24 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <title>Freestyle Game Design — Spear Relay</title>
+  <title>Freestyle Game Design — Energy Relay</title>
   <link rel="manifest" href="./site.webmanifest">
   <link rel="icon" href="./assets/branding/app-icon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="./src/style.css">
 </head>
 <body>
   <main class="game-shell">
-    <canvas id="gameCanvas" aria-label="Spear Relay prototype game area"></canvas>
+    <canvas id="gameCanvas" aria-label="Energy Relay prototype game area"></canvas>
 
     <section class="hud" aria-live="polite">
       <div class="hud-copy">
         <strong id="status">READY</strong>
-        <span id="hint">Move forward and the course will keep generating ahead of you.</span>
+        <span id="hint">Left side: pull back like a slingshot and release to transform.</span>
       </div>
       <button id="resetButton" type="button">Reset</button>
     </section>
 
-    <div class="prototype-tag" aria-hidden="true">SPEAR RELAY · PROTOTYPE 0.4</div>
+    <div class="prototype-tag" aria-hidden="true">ENERGY RELAY · PROTOTYPE 0.7</div>
   </main>
 
   <script type="module" src="./src/game.js"></script>

@@ -1,8 +1,8 @@
 {
   "id": "./",
-  "name": "Spear Relay — Freestyle Game Design",
-  "short_name": "Spear Relay",
-  "description": "Mobile-first Spear Relay gameplay prototype.",
+  "name": "Energy Relay — Freestyle Game Design",
+  "short_name": "Energy Relay",
+  "description": "Mobile-first energy-orb traversal prototype with slingshot launch and touch steering.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

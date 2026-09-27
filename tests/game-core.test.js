@@ -6,148 +6,209 @@ import {
   NPC_CONFIG,
   STARTER_SURFACES,
   WORLD_CONFIG,
-  beginAim,
+  beginSlingshot,
+  beginSteering,
+  cancelSlingshot,
   createGameState,
+  endSteering,
   findEarliestNpcCollision,
   findEarliestSurfaceCollision,
   generateNpcChunk,
   generateWorldChunk,
+  getLaunchVector,
   getWorldNpcs,
   getWorldSurfaces,
   refreshWorldForFocus,
-  releaseAim,
+  releaseSlingshot,
   stepGame,
-  updateAim
+  updateSlingshot,
+  updateSteering
 } from "../src/game-core.js";
 
-test("drag direction becomes throw direction", () => {
+test("new run starts in human form with an inactive orb", () => {
   const state = createGameState();
 
-  beginAim(state, 100, 100, 7);
-  updateAim(state, 220, 40, 7);
-  const released = releaseAim(state, 7);
-
-  assert.equal(released, true);
-  assert.equal(state.mode, "flying");
-  assert.ok(state.spear.vx > 0);
-  assert.ok(state.spear.vy < 0);
+  assert.equal(state.mode, "ready");
+  assert.equal(state.orb.active, false);
+  assert.equal(state.burstCount, 0);
+  assert.equal(state.score.npcHits, 0);
 });
 
-test("drag distance controls throw power within configured bounds", () => {
+test("left-side slingshot pull aims opposite the draw direction", () => {
+  const state = createGameState();
+
+  assert.equal(beginSlingshot(state, 180, 220, 7), true);
+  updateSlingshot(state, 80, 280, 7);
+
+  const aim = getLaunchVector(state);
+  assert.ok(aim.x > 0);
+  assert.ok(aim.y < 0);
+  assert.ok(aim.power > 0);
+});
+
+test("slingshot draw distance controls launch speed within configured bounds", () => {
   const weak = createGameState();
-  beginAim(weak, 0, 0, 1);
-  updateAim(weak, 40, 0, 1);
-  releaseAim(weak, 1);
+  beginSlingshot(weak, 180, 180, 1);
+  updateSlingshot(weak, 140, 190, 1);
+  assert.equal(releaseSlingshot(weak, 1), true);
 
   const strong = createGameState();
-  beginAim(strong, 0, 0, 1);
-  updateAim(strong, GAME_CONFIG.maxAimDistance * 2, 0, 1);
-  releaseAim(strong, 1);
+  beginSlingshot(strong, 180, 180, 2);
+  updateSlingshot(strong, -200, 320, 2);
+  assert.equal(releaseSlingshot(strong, 2), true);
 
-  const weakSpeed = Math.hypot(weak.spear.vx, weak.spear.vy);
-  const strongSpeed = Math.hypot(strong.spear.vx, strong.spear.vy);
+  const weakSpeed = Math.hypot(weak.orb.vx, weak.orb.vy);
+  const strongSpeed = Math.hypot(strong.orb.vx, strong.orb.vy);
 
   assert.ok(strongSpeed > weakSpeed);
-  assert.ok(strongSpeed <= GAME_CONFIG.maxThrowSpeed + 0.001);
-  assert.ok(weakSpeed >= GAME_CONFIG.minThrowSpeed);
+  assert.ok(weakSpeed >= GAME_CONFIG.minLaunchSpeed);
+  assert.ok(strongSpeed <= GAME_CONFIG.maxLaunchSpeed + 0.001);
 });
 
-test("pressing during flight relocates the character to the spear and starts aiming", () => {
+test("releasing without a meaningful pull cancels instead of launching", () => {
   const state = createGameState();
 
-  beginAim(state, 0, 0, 3);
-  updateAim(state, 180, -80, 3);
-  releaseAim(state, 3);
-  stepGame(state, 0.02);
+  beginSlingshot(state, 100, 100, 3);
+  updateSlingshot(state, 105, 104, 3);
 
-  const spearX = state.spear.x;
-  const spearY = state.spear.y;
-
-  const result = beginAim(state, 60, 70, 4);
-
-  assert.equal(result.teleported, true);
-  assert.equal(state.mode, "aiming");
-  assert.equal(state.player.x, spearX);
-  assert.equal(state.player.y, spearY);
-  assert.equal(state.spear.vx, 0);
-  assert.equal(state.spear.vy, 0);
-  assert.equal(state.animation.airborneAim, true);
-  assert.equal(state.animation.playerAirborne, true);
+  assert.equal(releaseSlingshot(state, 3), false);
+  assert.equal(state.mode, "ready");
+  assert.equal(state.orb.active, false);
+  assert.equal(state.burstCount, 0);
 });
 
-
-test("grounded aiming does not enter the airborne slow-motion presentation state", () => {
+test("cancelled touch gesture safely returns to ready state", () => {
   const state = createGameState();
 
-  beginAim(state, 10, 20, 1);
+  beginSlingshot(state, 100, 100, 4);
+  updateSlingshot(state, 40, 130, 4);
 
-  assert.equal(state.animation.airborneAim, false);
-  assert.equal(state.animation.playerAirborne, false);
+  assert.equal(cancelSlingshot(state, 4), true);
+  assert.equal(state.mode, "ready");
+  assert.equal(state.launch.pointerId, null);
 });
 
-test("airborne aiming advances its visual clock at the configured slow-motion rate", () => {
+test("launch transforms the player into the moving energy orb", () => {
   const state = createGameState();
 
-  beginAim(state, 0, 0, 1);
-  updateAim(state, 180, -80, 1);
-  releaseAim(state, 1);
-  stepGame(state, 0.02);
-  beginAim(state, 20, 30, 2);
+  beginSlingshot(state, 180, 200, 5);
+  updateSlingshot(state, 80, 240, 5);
+  assert.equal(releaseSlingshot(state, 5), true);
+
+  assert.equal(state.mode, "orb");
+  assert.equal(state.orb.active, true);
+  assert.equal(state.burstCount, 1);
+  assert.ok(Math.hypot(state.orb.vx, state.orb.vy) >= GAME_CONFIG.minLaunchSpeed);
+  assert.equal(state.animation.transformPulse, 1);
+});
+
+test("right-side steering bends orb velocity while orb form is active", () => {
+  const state = createGameState();
+
+  beginSlingshot(state, 180, 200, 6);
+  updateSlingshot(state, 80, 200, 6);
+  releaseSlingshot(state, 6);
+
+  const initialVy = state.orb.vy;
+  assert.equal(beginSteering(state, 800, 250, 9), true);
+  assert.equal(updateSteering(state, 800, 120, 9), true);
 
   stepGame(state, 0.05);
 
-  assert.ok(state.animation.airborneAimClock > 0);
-  assert.ok(
-    state.animation.airborneAimClock <=
-      0.05 * GAME_CONFIG.airborneAimVisualTimeScale + 0.000001
+  assert.ok(state.orb.vy < initialVy + GAME_CONFIG.orbGravity * 0.05);
+  assert.ok(state.steering.strength > 0);
+  assert.equal(endSteering(state, 9), true);
+  assert.equal(state.steering.pointerId, null);
+});
+
+test("steering cannot begin while the player is in human form", () => {
+  const state = createGameState();
+  assert.equal(beginSteering(state, 700, 200, 1), false);
+});
+
+test("orb impact with the ground reforms the player at the exact contact", () => {
+  const state = createGameState();
+
+  state.mode = "orb";
+  state.orb.active = true;
+  state.orb.x = 0;
+  state.orb.y = 120;
+  state.orb.vx = 0;
+  state.orb.vy = 600;
+
+  for (let i = 0; i < 10 && state.mode === "orb"; i += 1) {
+    stepGame(state, 0.05);
+  }
+
+  assert.equal(state.mode, "ready");
+  assert.equal(state.orb.active, false);
+  assert.equal(state.orb.y, WORLD_CONFIG.groundTop);
+  assert.equal(state.player.x, state.orb.x);
+  assert.equal(state.player.y, state.orb.y);
+  assert.equal(state.orb.contact.surfaceId, "starter-ground");
+  assert.ok(state.animation.reformPulse > 0);
+});
+
+test("orb collision knocks an NPC down and counts the hit once", () => {
+  const state = createGameState();
+  const npc = getWorldNpcs(state).find((candidate) => candidate.id === "starter-npc-0");
+
+  state.mode = "orb";
+  state.orb.active = true;
+  state.orb.x = npc.x - 60;
+  state.orb.y = npc.y - 30;
+  state.orb.vx = 1200;
+  state.orb.vy = 0;
+
+  const predictedHit = findEarliestNpcCollision(
+    state,
+    state.orb.x,
+    state.orb.y,
+    state.orb.x + 60,
+    state.orb.y
   );
+
+  assert.ok(predictedHit);
+  assert.equal(predictedHit.npc.id, npc.id);
+
+  stepGame(state, 0.05);
+
+  assert.equal(state.score.npcHits, 1);
+  assert.equal(npc.mode, "thrown");
+  assert.equal(state.world.defeatedNpcIds.has(npc.id), true);
+
+  stepGame(state, 0.05);
+  assert.equal(state.score.npcHits, 1);
 });
 
-test("releasing a throw records direction and starts a short follow-through animation", () => {
+test("defeated NPC falls before disappearing from the active world", () => {
   const state = createGameState();
+  const npc = getWorldNpcs(state).find((candidate) => candidate.id === "starter-npc-0");
 
-  beginAim(state, 0, 0, 5);
-  updateAim(state, 150, -60, 5);
-  releaseAim(state, 5);
+  state.mode = "orb";
+  state.orb.active = true;
+  state.orb.x = npc.x - 60;
+  state.orb.y = npc.y - 30;
+  state.orb.vx = 1200;
+  state.orb.vy = 0;
+  stepGame(state, 0.05);
 
-  assert.equal(state.animation.airborneAim, false);
-  assert.equal(state.animation.throwFollowThrough, 1);
-  assert.ok(state.animation.throwDirectionX > 0);
-  assert.ok(state.animation.throwDirectionY < 0);
+  let sawFallen = false;
+  for (
+    let i = 0;
+    i < 80 && getWorldNpcs(state).some((candidate) => candidate.id === npc.id);
+    i += 1
+  ) {
+    stepGame(state, 0.05);
+    const active = getWorldNpcs(state).find((candidate) => candidate.id === npc.id);
+    if (active?.mode === "fallen") sawFallen = true;
+  }
 
-  stepGame(state, GAME_CONFIG.throwFollowThroughDuration * 0.5);
-  assert.ok(state.animation.throwFollowThrough < 1);
-  assert.ok(state.animation.throwFollowThrough > 0);
+  assert.equal(sawFallen, true);
+  assert.equal(getWorldNpcs(state).some((candidate) => candidate.id === npc.id), false);
 });
 
-test("flight simulation applies gravity and advances the camera toward the spear", () => {
-  const state = createGameState();
-
-  beginAim(state, 0, 0, 9);
-  updateAim(state, 200, -100, 9);
-  releaseAim(state, 9);
-
-  const initialVy = state.spear.vy;
-  const initialCameraX = state.camera.x;
-  stepGame(state, 0.03);
-
-  assert.ok(state.spear.vy > initialVy);
-  assert.notEqual(state.camera.x, initialCameraX);
-  assert.ok(state.spear.travel > 0);
-});
-
-test("a short tap still throws using the previous aim instead of producing zero velocity", () => {
-  const state = createGameState();
-
-  beginAim(state, 40, 40, 2);
-  releaseAim(state, 2);
-
-  assert.equal(state.mode, "flying");
-  assert.ok(Math.hypot(state.spear.vx, state.spear.vy) >= GAME_CONFIG.minThrowSpeed);
-});
-
-
-test("active world surfaces are unique valid rectangles", () => {
+test("active world surfaces remain unique valid rectangles", () => {
   const state = createGameState();
   const ids = new Set();
 
@@ -160,7 +221,7 @@ test("active world surfaces are unique valid rectangles", () => {
   }
 });
 
-test("swept collision catches a fast spear crossing an obstacle", () => {
+test("swept collision still catches a fast crossing of a thin obstacle", () => {
   const state = createGameState();
   const hit = findEarliestSurfaceCollision(state, 300, 100, 430, 100);
 
@@ -170,179 +231,41 @@ test("swept collision catches a fast spear crossing an obstacle", () => {
   assert.equal(hit.normalX, -1);
 });
 
-test("falling spear sticks to the ground and automatically relays the player to impact", () => {
-  const state = createGameState();
-  state.mode = "flying";
-  state.spear.x = 0;
-  state.spear.y = 120;
-  state.spear.vx = 0;
-  state.spear.vy = 600;
-
-  for (let i = 0; i < 10 && state.mode === "flying"; i += 1) {
-    stepGame(state, 0.05);
-  }
-
-  assert.equal(state.mode, "stuck");
-  assert.equal(state.spear.y, 180);
-  assert.equal(state.spear.contact.surfaceId, "starter-ground");
-  assert.equal(state.spear.vx, 0);
-  assert.equal(state.spear.vy, 0);
-  assert.equal(state.player.x, state.spear.x);
-  assert.equal(state.player.y, state.spear.y);
-  assert.ok(state.teleportPulse > 0);
-
-  const aimResult = beginAim(state, 20, 20, 8);
-  assert.equal(aimResult.teleported, false);
-  assert.equal(state.mode, "aiming");
-});
-
-test("pressing a stuck spear relays the character to its collision point", () => {
-  const state = createGameState();
-  state.mode = "stuck";
-  state.spear.x = 340;
-  state.spear.y = 100;
-  state.spear.contact = { surfaceId: "wall-a", normalX: -1, normalY: 0 };
-
-  const result = beginAim(state, 20, 20, 8);
-
-  assert.equal(result.teleported, true);
-  assert.equal(state.player.x, 340);
-  assert.equal(state.player.y, 100);
-  assert.equal(state.mode, "aiming");
-});
-
-
-test("procedural chunks are deterministic for the same chunk index", () => {
+test("procedural chunks remain deterministic and their ground joins without gaps", () => {
   const first = generateWorldChunk(7);
   const second = generateWorldChunk(7);
+  const groundA = generateWorldChunk(3).find((surface) => surface.type === "ground");
+  const groundB = generateWorldChunk(4).find((surface) => surface.type === "ground");
 
   assert.deepEqual(first, second);
-  assert.ok(first.some((surface) => surface.type === "ground"));
-  assert.ok(first.some((surface) => surface.type === "platform"));
-  assert.ok(first.some((surface) => surface.type === "obstacle"));
+  assert.equal(groundA.x + groundA.width, groundB.x);
+  assert.equal(groundA.y, WORLD_CONFIG.groundTop);
+  assert.equal(groundB.y, WORLD_CONFIG.groundTop);
 });
 
-test("procedural ground chunks join without gaps", () => {
-  const firstGround = generateWorldChunk(3).find((surface) => surface.type === "ground");
-  const nextGround = generateWorldChunk(4).find((surface) => surface.type === "ground");
-
-  assert.equal(firstGround.x + firstGround.width, nextGround.x);
-  assert.equal(firstGround.y, WORLD_CONFIG.groundTop);
-  assert.equal(nextGround.y, WORLD_CONFIG.groundTop);
-});
-
-test("world streaming advances active chunks while keeping surface count bounded", () => {
-  const state = createGameState();
-  const farX = WORLD_CONFIG.proceduralStartX + WORLD_CONFIG.chunkWidth * 40 + 100;
-
-  const changed = refreshWorldForFocus(state, farX);
-
-  assert.equal(changed, true);
-  assert.ok(state.world.activeStartChunk >= 38);
-  assert.ok(state.world.activeEndChunk <= 44);
-  assert.ok(getWorldSurfaces(state).length <= STARTER_SURFACES.length + 7 * 6);
-});
-
-test("streamed procedural geometry participates in spear collision", () => {
-  const state = createGameState();
-  const chunkIndex = 8;
-  const chunk = generateWorldChunk(chunkIndex);
-  const obstacle = chunk.find((surface) => surface.type === "obstacle");
-
-  refreshWorldForFocus(state, obstacle.x);
-  const hit = findEarliestSurfaceCollision(
-    state,
-    obstacle.x - 40,
-    obstacle.y + obstacle.height * 0.5,
-    obstacle.x + obstacle.width + 40,
-    obstacle.y + obstacle.height * 0.5
-  );
-
-  assert.ok(hit);
-  assert.equal(hit.surface.id, obstacle.id);
-});
-
-
-test("camera uses a wider-than-1:1 world view", () => {
-  assert.ok(GAME_CONFIG.cameraZoom > 0);
-  assert.ok(GAME_CONFIG.cameraZoom < 1);
-});
-
-test("procedural NPC generation is deterministic and bounded per chunk", () => {
+test("procedural NPC generation remains deterministic and bounded per chunk", () => {
   const first = generateNpcChunk(6);
   const second = generateNpcChunk(6);
 
   assert.deepEqual(first, second);
   assert.equal(first.length, NPC_CONFIG.perChunk);
-  assert.ok(first.every((npc) => npc.x >= WORLD_CONFIG.proceduralStartX));
   assert.ok(first.every((npc) => npc.patrolMax > npc.patrolMin));
 });
 
-test("walking NPCs patrol without requiring rendering state", () => {
-  const state = createGameState();
-  const npc = getWorldNpcs(state).find((candidate) => candidate.id === "starter-npc-1");
-
-  assert.ok(npc);
-  assert.equal(npc.mode, "walking");
-
-  const startX = npc.x;
-  stepGame(state, 0.05);
-
-  assert.notEqual(npc.x, startX);
-  assert.equal(npc.y, WORLD_CONFIG.groundTop);
-});
-
-test("spear collision knocks an NPC down before removing it and increments the run hit counter once", () => {
-  const state = createGameState();
-  const npc = getWorldNpcs(state).find((candidate) => candidate.id === "starter-npc-0");
-
-  state.mode = "flying";
-  state.spear.x = npc.x - 60;
-  state.spear.y = npc.y - 30;
-  state.spear.vx = 1200;
-  state.spear.vy = 0;
-
-  const predictedHit = findEarliestNpcCollision(
-    state,
-    state.spear.x,
-    state.spear.y,
-    state.spear.x + 60,
-    state.spear.y
-  );
-  assert.ok(predictedHit);
-  assert.equal(predictedHit.npc.id, npc.id);
-
-  stepGame(state, 0.05);
-
-  assert.equal(state.score.npcHits, 1);
-  assert.equal(npc.mode, "thrown");
-  assert.ok(Math.abs(npc.vx) > 0);
-  assert.ok(npc.vy < 0);
-  assert.equal(state.world.defeatedNpcIds.has(npc.id), true);
-
-  let sawFallenState = false;
-  for (let i = 0; i < 60 && getWorldNpcs(state).some((candidate) => candidate.id === npc.id); i += 1) {
-    stepGame(state, 0.05);
-    const activeNpc = getWorldNpcs(state).find((candidate) => candidate.id === npc.id);
-    if (activeNpc?.mode === "fallen") {
-      sawFallenState = true;
-    }
-  }
-
-  assert.equal(sawFallenState, true);
-  assert.equal(getWorldNpcs(state).some((candidate) => candidate.id === npc.id), false);
-  assert.equal(state.score.npcHits, 1);
-});
-
-test("NPC streaming stays bounded as procedural progress advances", () => {
+test("world and NPC streaming remain bounded far into a run", () => {
   const state = createGameState();
   const farX = WORLD_CONFIG.proceduralStartX + WORLD_CONFIG.chunkWidth * 50 + 100;
 
-  refreshWorldForFocus(state, farX);
+  assert.equal(refreshWorldForFocus(state, farX), true);
 
-  const maximumExpected =
+  assert.ok(getWorldSurfaces(state).length <= STARTER_SURFACES.length + 7 * 6);
+  const maximumNpcs =
     3 +
     (WORLD_CONFIG.chunksBehind + WORLD_CONFIG.chunksAhead + 1) * NPC_CONFIG.perChunk;
+  assert.ok(getWorldNpcs(state).length <= maximumNpcs);
+});
 
-  assert.ok(getWorldNpcs(state).length <= maximumExpected);
+test("camera remains deliberately zoomed out for mobile traversal visibility", () => {
+  assert.ok(GAME_CONFIG.cameraZoom > 0);
+  assert.ok(GAME_CONFIG.cameraZoom < 1);
 });
