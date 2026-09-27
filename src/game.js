@@ -1,9 +1,9 @@
 import {
-  WORLD_SURFACES,
   beginAim,
   createGameState,
   getAimVector,
   getPlayerHandPosition,
+  getWorldSurfaces,
   releaseAim,
   stepGame,
   updateAim
@@ -118,7 +118,7 @@ function drawWorldGrid() {
 function drawWorldSurfaces() {
   ctx.save();
 
-  for (const surface of WORLD_SURFACES) {
+  for (const surface of getWorldSurfaces(state)) {
     const p = worldToScreen(surface.x, surface.y);
 
     if (
@@ -318,13 +318,13 @@ function render() {
 
 function updateHud() {
   if (state.mode === "flying") {
-    statusNode.textContent = `SPEAR IN FLIGHT · THROW ${state.throwCount}`;
+    statusNode.textContent = `SPEAR IN FLIGHT · THROW ${state.throwCount} · ${Math.max(0, Math.round(state.world.maxProgressX / 10))}m`;
     hintNode.textContent = "Press and hold to jump to the spear now, then slide to aim the next throw.";
     return;
   }
 
   if (state.mode === "stuck") {
-    statusNode.textContent = `SPEAR PLANTED · THROW ${state.throwCount}`;
+    statusNode.textContent = `SPEAR PLANTED · THROW ${state.throwCount} · ${Math.max(0, Math.round(state.world.maxProgressX / 10))}m`;
     hintNode.textContent = "Hold the screen to relay onto this surface, slide to aim, then release.";
     return;
   }
@@ -336,7 +336,7 @@ function updateHud() {
   }
 
   statusNode.textContent = "READY";
-  hintNode.textContent = "Use the floor, platforms and obstacles: hold, slide to aim, release to throw.";
+  hintNode.textContent = "Move forward and the course will keep generating ahead of you.";
 }
 
 function recordTrail() {

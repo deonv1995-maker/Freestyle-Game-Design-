@@ -11,8 +11,25 @@ export const GAME_CONFIG = Object.freeze({
   handHeight: 34
 });
 
-export const WORLD_SURFACES = Object.freeze([
-  Object.freeze({ id: "ground", type: "ground", x: -1800, y: GROUND_TOP, width: 5000, height: 620 }),
+export const WORLD_CONFIG = Object.freeze({
+  seed: 2000,
+  groundTop: GROUND_TOP,
+  groundDepth: 620,
+  proceduralStartX: 1600,
+  chunkWidth: 820,
+  chunksBehind: 2,
+  chunksAhead: 4
+});
+
+export const STARTER_SURFACES = Object.freeze([
+  Object.freeze({
+    id: "starter-ground",
+    type: "ground",
+    x: -1800,
+    y: GROUND_TOP,
+    width: WORLD_CONFIG.proceduralStartX + 1800,
+    height: WORLD_CONFIG.groundDepth
+  }),
   Object.freeze({ id: "platform-a", type: "platform", x: 70, y: 88, width: 170, height: 24 }),
   Object.freeze({ id: "wall-a", type: "obstacle", x: 340, y: 18, width: 52, height: 162 }),
   Object.freeze({ id: "platform-b", type: "platform", x: 500, y: -54, width: 220, height: 26 }),
@@ -20,6 +37,34 @@ export const WORLD_SURFACES = Object.freeze([
   Object.freeze({ id: "platform-c", type: "platform", x: 900, y: 22, width: 200, height: 24 }),
   Object.freeze({ id: "platform-d", type: "platform", x: 1150, y: -112, width: 240, height: 24 }),
   Object.freeze({ id: "block-d", type: "obstacle", x: 1450, y: 32, width: 112, height: 148 })
+]);
+
+const CHUNK_PATTERNS = Object.freeze([
+  Object.freeze([
+    Object.freeze({ type: "platform", x: 90, y: 88, width: 180, height: 24 }),
+    Object.freeze({ type: "obstacle", x: 340, width: 52, height: 128 }),
+    Object.freeze({ type: "platform", x: 465, y: -8, width: 205, height: 26 }),
+    Object.freeze({ type: "obstacle", x: 735, width: 48, height: 92 })
+  ]),
+  Object.freeze([
+    Object.freeze({ type: "obstacle", x: 125, width: 66, height: 96 }),
+    Object.freeze({ type: "platform", x: 265, y: 54, width: 185, height: 24 }),
+    Object.freeze({ type: "obstacle", x: 515, width: 54, height: 148 }),
+    Object.freeze({ type: "platform", x: 610, y: -48, width: 175, height: 26 })
+  ]),
+  Object.freeze([
+    Object.freeze({ type: "platform", x: 72, y: 36, width: 168, height: 24 }),
+    Object.freeze({ type: "obstacle", x: 300, width: 50, height: 158 }),
+    Object.freeze({ type: "platform", x: 405, y: 98, width: 150, height: 24 }),
+    Object.freeze({ type: "obstacle", x: 605, width: 48, height: 112 }),
+    Object.freeze({ type: "platform", x: 675, y: 4, width: 118, height: 24 })
+  ]),
+  Object.freeze([
+    Object.freeze({ type: "obstacle", x: 92, width: 52, height: 122 }),
+    Object.freeze({ type: "platform", x: 210, y: 6, width: 205, height: 26 }),
+    Object.freeze({ type: "platform", x: 470, y: 82, width: 150, height: 24 }),
+    Object.freeze({ type: "obstacle", x: 668, width: 58, height: 166 })
+  ])
 ]);
 
 const DEFAULT_AIM = Object.freeze({
@@ -57,9 +102,16 @@ export function createGameState() {
     },
     lastAim: { ...DEFAULT_AIM },
     camera: { ...START_POSITION },
-    teleportPulse: 0
+    teleportPulse: 0,
+    world: {
+      maxProgressX: START_POSITION.x,
+      activeStartChunk: null,
+      activeEndChunk: null,
+      surfaces: []
+    }
   };
 
+  refreshWorldForFocus(state, START_POSITION.x);
   placeSpearInHand(state);
   return state;
 }
@@ -71,6 +123,8 @@ export function beginAim(state, pointerX, pointerY, pointerId = 0) {
     state.player.x = state.spear.x;
     state.player.y = state.spear.y;
     state.teleportPulse = 1;
+    state.world.maxProgressX = Math.max(state.world.maxProgressX, state.player.x);
+    refreshWorldForFocus(state, state.player.x);
   }
 
   state.mode = "aiming";
@@ -158,7 +212,9 @@ export function stepGame(state, deltaSeconds) {
     state.spear.vy += GAME_CONFIG.gravity * dt;
     const nextX = startX + state.spear.vx * dt;
     const nextY = startY + state.spear.vy * dt;
-    const hit = findEarliestSurfaceCollision(startX, startY, nextX, nextY);
+
+    refreshWorldForFocus(state, nextX);
+    const hit = findEarliestSurfaceCollision(state, startX, startY, nextX, nextY);
 
     if (hit) {
       state.spear.x = hit.x;
@@ -180,6 +236,7 @@ export function stepGame(state, deltaSeconds) {
       state.spear.angle = Math.atan2(state.spear.vy, state.spear.vx);
     }
   } else if (state.mode !== "stuck") {
+    refreshWorldForFocus(state, state.player.x);
     placeSpearInHand(state);
   }
 
@@ -207,10 +264,99 @@ export function getPlayerHandPosition(state) {
   };
 }
 
-export function findEarliestSurfaceCollision(startX, startY, endX, endY) {
+export function getWorldSurfaces(state) {
+  return state.world.surfaces;
+}
+
+export function refreshWorldForFocus(state, focusX) {
+  const focusChunk = getChunkIndexForX(focusX);
+  const startChunk = Math.max(0, focusChunk - WORLD_CONFIG.chunksBehind);
+  const endChunk = focusChunk + WORLD_CONFIG.chunksAhead;
+
+  if (
+    state.world.activeStartChunk === startChunk &&
+    state.world.activeEndChunk === endChunk &&
+    state.world.surfaces.length > 0
+  ) {
+    return false;
+  }
+
+  const surfaces = [...STARTER_SURFACES];
+
+  for (let chunkIndex = startChunk; chunkIndex <= endChunk; chunkIndex += 1) {
+    surfaces.push(...generateWorldChunk(chunkIndex));
+  }
+
+  state.world.activeStartChunk = startChunk;
+  state.world.activeEndChunk = endChunk;
+  state.world.surfaces = surfaces;
+  return true;
+}
+
+export function generateWorldChunk(chunkIndex) {
+  const safeIndex = Math.max(0, Math.floor(chunkIndex));
+  const chunkX = WORLD_CONFIG.proceduralStartX + safeIndex * WORLD_CONFIG.chunkWidth;
+  const patternIndex = Math.floor(seededUnit(safeIndex, 0) * CHUNK_PATTERNS.length);
+  const pattern = CHUNK_PATTERNS[Math.min(CHUNK_PATTERNS.length - 1, patternIndex)];
+  const difficulty = Math.min(1, safeIndex / 12);
+  const surfaces = [
+    {
+      id: `chunk-${safeIndex}-ground`,
+      type: "ground",
+      x: chunkX,
+      y: GROUND_TOP,
+      width: WORLD_CONFIG.chunkWidth,
+      height: WORLD_CONFIG.groundDepth,
+      chunkIndex: safeIndex
+    }
+  ];
+
+  let platformNumber = 0;
+  let obstacleNumber = 0;
+
+  for (let elementIndex = 0; elementIndex < pattern.length; elementIndex += 1) {
+    const element = pattern[elementIndex];
+    const heightVariation = Math.round((seededUnit(safeIndex, elementIndex + 1) - 0.5) * 34);
+
+    if (element.type === "platform") {
+      const difficultyLift = Math.round(difficulty * 30);
+      surfaces.push({
+        id: `chunk-${safeIndex}-platform-${platformNumber}`,
+        type: "platform",
+        x: chunkX + element.x,
+        y: element.y + heightVariation - difficultyLift,
+        width: element.width,
+        height: element.height,
+        chunkIndex: safeIndex
+      });
+      platformNumber += 1;
+      continue;
+    }
+
+    const obstacleHeight = Math.max(
+      72,
+      element.height + Math.round(heightVariation * 0.5) + Math.round(difficulty * 24)
+    );
+
+    surfaces.push({
+      id: `chunk-${safeIndex}-obstacle-${obstacleNumber}`,
+      type: "obstacle",
+      x: chunkX + element.x,
+      y: GROUND_TOP - obstacleHeight,
+      width: element.width,
+      height: obstacleHeight,
+      chunkIndex: safeIndex
+    });
+    obstacleNumber += 1;
+  }
+
+  return surfaces;
+}
+
+export function findEarliestSurfaceCollision(state, startX, startY, endX, endY) {
   let earliest = null;
 
-  for (const surface of WORLD_SURFACES) {
+  for (const surface of state.world.surfaces) {
     const hit = segmentRectIntersection(startX, startY, endX, endY, surface);
     if (!hit) continue;
 
@@ -220,6 +366,33 @@ export function findEarliestSurfaceCollision(startX, startY, endX, endY) {
   }
 
   return earliest;
+}
+
+function getChunkIndexForX(x) {
+  if (x <= WORLD_CONFIG.proceduralStartX) {
+    return 0;
+  }
+
+  return Math.max(
+    0,
+    Math.floor((x - WORLD_CONFIG.proceduralStartX) / WORLD_CONFIG.chunkWidth)
+  );
+}
+
+function seededUnit(chunkIndex, salt) {
+  let value =
+    WORLD_CONFIG.seed ^
+    Math.imul(chunkIndex + 1, 0x9e3779b1) ^
+    Math.imul(salt + 1, 0x85ebca6b);
+
+  value >>>= 0;
+  value ^= value >>> 16;
+  value = Math.imul(value, 0x7feb352d);
+  value ^= value >>> 15;
+  value = Math.imul(value, 0x846ca68b);
+  value ^= value >>> 16;
+
+  return (value >>> 0) / 4294967296;
 }
 
 function placeSpearInHand(state) {
@@ -281,7 +454,9 @@ function segmentRectIntersection(startX, startY, endX, endY, rect) {
 
 function clipAxis(start, delta, min, max, minNormalX, minNormalY, maxNormalX, maxNormalY) {
   if (Math.abs(delta) < 1e-9) {
-    return start < min || start > max ? null : { enter: 0, exit: 1, normalX: 0, normalY: 0 };
+    return start < min || start > max
+      ? null
+      : { enter: 0, exit: 1, normalX: 0, normalY: 0 };
   }
 
   const tMin = (min - start) / delta;

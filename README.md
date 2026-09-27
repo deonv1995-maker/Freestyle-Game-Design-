@@ -4,7 +4,7 @@ An experimental game-design repository for rapidly turning ideas into playable p
 
 This project is intentionally open-ended. It may become one game, several experiments, or a place to test unusual mechanics before deciding what deserves deeper development.
 
-## Current playable slice — Spear Relay 0.2
+## Current playable slice — Spear Relay 0.3
 
 The current prototype is a mobile-first 2D traversal mechanic:
 
@@ -16,17 +16,17 @@ The current prototype is a mobile-first 2D traversal mechanic:
 - the spear now collides with the floor, platforms and solid obstacles instead of passing through them;\n- press again while the spear is flying or planted to relocate the character to the spear's current position;
 - that same press immediately starts the next aiming gesture.
 
-This deliberately tests the movement loop before adding enemies, platforms, progression, art production or a larger game concept.
+The handmade opening section now flows into an endless deterministic traversal course. As play moves forward, nearby world chunks are generated from a fixed seed, each with continuous ground plus varied platforms and obstacles. Old distant procedural chunks are discarded and can be regenerated identically later, keeping runtime memory bounded on mobile.
 
-The spear uses light ballistic gravity. There is no terrain collision or death state yet; those are intentionally outside this first mechanic test.
+The prototype is still focused on movement. There are no enemies, damage, death state or larger progression systems yet.
 
 ## Technical foundation
 
 The first prototype uses browser-native HTML5 Canvas and JavaScript with no runtime dependencies.
 
-Gameplay state, world geometry and collision physics live in `src/game-core.js`. Pointer input, rendering and HUD presentation live in `src/game.js`.
+Gameplay state, deterministic chunk generation, active world geometry and collision physics live in `src/game-core.js`. Pointer input, rendering and HUD presentation live in `src/game.js`.
 
-The static build is produced by `scripts/build.mjs`, and the repository includes automated gameplay-state and collision tests plus GitHub Actions verification.
+The static build is produced by `scripts/build.mjs`, and the repository includes automated gameplay-state, collision and procedural-world tests plus GitHub Actions verification.
 
 This choice is intentionally lightweight. It is not a permanent commitment to a larger engine if future experiments require one.
 

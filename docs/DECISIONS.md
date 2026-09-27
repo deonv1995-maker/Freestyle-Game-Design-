@@ -68,3 +68,16 @@ Spear movement uses swept segment-versus-rectangle collision each physics step. 
 The player's stored world position now represents the character's feet. This keeps an exact relay to a horizontal surface contact visually grounded without introducing a second correction/placement system.
 
 Reason: the world needs reliable collision for mobile traversal, high-speed throws must not tunnel through thin platforms, and world geometry should remain expandable without duplicating collision coordinates in rendering code.
+
+
+## 2026-09-27 — Prototype 0.3 streams deterministic procedural traversal chunks
+
+Decision: the handmade opening course remains the authored starting area. Beyond x=1600, the traversal world is produced in fixed-width chunks from a repository-owned seed and a small set of controlled traversal patterns.
+
+Each generated chunk owns its continuous ground plus its platform and obstacle geometry. The same generated surface collection is consumed by both rendering and collision, preserving one source of truth.
+
+Only a bounded window of procedural chunks around the current player/spear focus is kept active. Distant chunks are discarded and regenerated deterministically from their chunk index when revisited. This prevents an endless run from causing unbounded geometry growth on mobile.
+
+Player progress is recorded when the relay actually moves the player forward; spear flight may stream geometry ahead so collision remains available before the player arrives.
+
+Reason: the course should continue indefinitely as the player advances without duplicating geometry systems, introducing random impossible seams, or allowing memory use to grow forever.
