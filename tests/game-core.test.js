@@ -802,6 +802,7 @@ test("camera remains zoomed out for mobile vertical traversal visibility", () =>
 });
 
 test("configured space-corridor values remain physically valid", () => {
+  assert.equal(GAME_CONFIG.touchTimeScale, 0.4);
   assert.equal(GAME_CONFIG.orbGravity, 0);
   assert.ok(GAME_CONFIG.touchTimeScale > 0);
   assert.ok(GAME_CONFIG.touchTimeScale < 1);
