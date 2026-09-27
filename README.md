@@ -13,7 +13,7 @@ This project is intentionally open-ended. It may become one game, several experi
 - The course is now an enclosed survival corridor with a continuous roof, top/bottom moving platforms, moving timed lasers, floor spike pits and roof spikes.
 - The orb has seven lives. A lethal hit respawns at the latest checkpoint with short invulnerability; losing the seventh life automatically starts a fresh run.
 - Checkpoints advance the respawn point and difficulty level. Later sections increase platform motion, laser pressure, spike density and drone pressure.
-- Targeting drones pursue within range and fire projectiles. Drone and projectile speed remain below the orb's configured maximum speed.
+- Targeting drones pursue within range and fire projectiles. Direct orb contact destroys the drone without costing a life; fired projectiles remain lethal. Drone and projectile speed remain below the orb's configured maximum speed.
 - The HUD tracks lives, current distance, best record, checkpoint and difficulty level. The best distance record persists locally in the browser.
 - Procedural chunks, hazards, checkpoints and drones are deterministic and streamed within bounded windows for mobile-friendly runtime behavior.
 
