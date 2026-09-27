@@ -809,7 +809,7 @@ function updateHud() {
   if (state.mode === "orb") {
     statusNode.textContent = `ENERGY FORM · ${runStats}`;
     hintNode.textContent =
-      "Zero gravity: every touch slows time, giving you a window to redirect around flickering lasers and drones.";
+      "Zero gravity: every touch slows time—read laser flicker and drone charge rings before committing.";
     return;
   }
 
