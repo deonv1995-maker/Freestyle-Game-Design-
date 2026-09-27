@@ -4,33 +4,18 @@ An experimental game-design repository for rapidly turning ideas into playable p
 
 This project is intentionally open-ended. It may become one game, several experiments, or a place to test unusual mechanics before deciding what deserves deeper development.
 
-## Current playable slice — Energy Relay 0.10
+## Current playable slice — Energy Relay 0.11
 
-The current prototype is a mobile-first 2D traversal mechanic built around a character transformation power:
-
-- the player begins in normal human form;
-- press and hold anywhere on the game area;
-- drag in the direction you want the character to travel;
-- drag distance controls launch power;
-- release to transform into the bright blue lightning-energy orb and launch;
-- **while the orb is still airborne, press again to freeze gameplay at its exact current position**;
-- during the freeze, drag a new direction and release to redirect the same orb without starting a new burst;
-- the freeze can be used repeatedly during the same airborne burst;
-- cancelling the midair aim resumes the orb with its original velocity;
-- NPC movement and orb physics are paused while the redirect aim is active;
-- side impacts against walls, obstacles and platforms rebound instead of trapping the character;
-- underside impacts against platforms rebound;
-- obstacle tops are non-standable and rebound the orb;
-- only a downward landing on the top of ground or a platform ends orb form and reforms the player;
-- the traversal course now reads as a futuristic vertical city: standable surfaces render as rooftops, landing pads and hover cars, while non-standable obstacles render as tall towers and spires;
-- tower heights are centralized in `CITY_CONFIG` and deliberately exceed the rise of a simple full-power 45-degree launch, making midair freeze/redirection useful for climbing and routing rather than letting the orb casually clear the skyline in one diagonal shot;
-- the procedural course and deterministic bounded NPC/world streaming remain the source of truth for endless traversal.
-
-The energy-orb visual treatment remains the same: blue core, glow, lightning arcs, transformation pulse and energy trail. Midair redirect adds only a subtle time-freeze field and aim guide around the frozen orb.
-
-The handmade opening section still flows into an endless deterministic traversal course. Nearby world chunks are generated from a fixed seed and distant chunks are discarded and regenerated identically when needed, keeping runtime state bounded for mobile.
-
-The prototype remains focused on traversal feel. NPCs are non-hostile targets; there is still no player damage, death state or larger progression system.
+- The player remains permanently in the blue energy-orb state; there is no human reform state.
+- Drag in the direction of travel to launch from rest. While airborne, press/hold to freeze gameplay and drag a new direction to redirect the same orb.
+- Solid floor, roof and moving-platform contacts bounce the orb. Restitution and tangential damping bleed momentum until a low-speed floor contact settles the orb for another launch.
+- The previous city towers/obstacles and NPC targets are removed from the active loop.
+- The course is now an enclosed survival corridor with a continuous roof, top/bottom moving platforms, moving timed lasers, floor spike pits and roof spikes.
+- The orb has seven lives. A lethal hit respawns at the latest checkpoint with short invulnerability; losing the seventh life automatically starts a fresh run.
+- Checkpoints advance the respawn point and difficulty level. Later sections increase platform motion, laser pressure, spike density and drone pressure.
+- Targeting drones pursue within range and fire projectiles. Drone and projectile speed remain below the orb's configured maximum speed.
+- The HUD tracks lives, current distance, best record, checkpoint and difficulty level. The best distance record persists locally in the browser.
+- Procedural chunks, hazards, checkpoints and drones are deterministic and streamed within bounded windows for mobile-friendly runtime behavior.
 
 ## Technical foundation
 

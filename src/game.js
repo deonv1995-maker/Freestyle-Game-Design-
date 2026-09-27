@@ -1,16 +1,18 @@
 import {
+  DRONE_CONFIG,
   GAME_CONFIG,
-  NPC_CONFIG,
   beginAim,
   cancelAim,
   createGameState,
   getLaunchVector,
-  getWorldNpcs,
+  getWorldCheckpoints,
+  getWorldDrones,
+  getWorldHazards,
+  getWorldProjectiles,
   getWorldSurfaces,
   releaseAim,
   stepGame,
   updateAim
-
 } from "./game-core.js";
 
 const canvas = document.querySelector("#gameCanvas");
@@ -19,6 +21,8 @@ const statusNode = document.querySelector("#status");
 const hintNode = document.querySelector("#hint");
 const resetButton = document.querySelector("#resetButton");
 
+const RECORD_KEY = "energy-relay-best-distance-metres-v1";
+
 let state = createGameState();
 let trail = [];
 let lastTime = performance.now();
@@ -26,6 +30,8 @@ let viewportWidth = 1;
 let viewportHeight = 1;
 let pixelRatio = 1;
 let lastHudSnapshot = "";
+let lastRespawnSerial = state.run.respawnSerial;
+let bestDistanceMetres = loadBestDistance();
 
 const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
@@ -56,9 +62,9 @@ function worldToScreen(x, y) {
 
 function drawBackground() {
   const gradient = ctx.createLinearGradient(0, 0, 0, viewportHeight);
-  gradient.addColorStop(0, "#14213b");
-  gradient.addColorStop(0.55, "#10182b");
-  gradient.addColorStop(1, "#090d18");
+  gradient.addColorStop(0, "#101d35");
+  gradient.addColorStop(0.55, "#0c1425");
+  gradient.addColorStop(1, "#070b13");
   ctx.fillStyle = gradient;
   ctx.fillRect(0, 0, viewportWidth, viewportHeight);
 
@@ -68,7 +74,7 @@ function drawBackground() {
 
 function drawParallaxDots() {
   ctx.save();
-  ctx.fillStyle = "rgba(217, 230, 255, 0.24)";
+  ctx.fillStyle = "rgba(217, 230, 255, 0.2)";
 
   const spacing = 96;
   const offsetX = mod(-state.camera.x * 0.16, spacing);
@@ -76,8 +82,11 @@ function drawParallaxDots() {
 
   for (let y = offsetY - spacing; y < viewportHeight + spacing; y += spacing) {
     for (let x = offsetX - spacing; x < viewportWidth + spacing; x += spacing) {
-      const key = Math.sin((x + state.camera.x * 0.16) * 0.021 + (y + state.camera.y * 0.12) * 0.037);
-      const radius = key > 0.2 ? 1.4 : 0.8;
+      const key = Math.sin(
+        (x + state.camera.x * 0.16) * 0.021 +
+          (y + state.camera.y * 0.12) * 0.037
+      );
+      const radius = key > 0.2 ? 1.3 : 0.75;
       ctx.beginPath();
       ctx.arc(x, y, radius, 0, Math.PI * 2);
       ctx.fill();
@@ -94,7 +103,7 @@ function drawWorldGrid() {
   const startY = mod(center.y, spacing) - spacing;
 
   ctx.save();
-  ctx.strokeStyle = "rgba(255, 255, 255, 0.045)";
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.035)";
   ctx.lineWidth = 1;
 
   for (let x = startX; x <= viewportWidth + spacing; x += spacing) {
@@ -111,19 +120,11 @@ function drawWorldGrid() {
     ctx.stroke();
   }
 
-  ctx.fillStyle = "rgba(255,255,255,0.16)";
-  ctx.font = "11px ui-monospace, monospace";
-  ctx.fillText(
-    `x ${Math.round(state.camera.x)}   y ${Math.round(state.camera.y)}`,
-    14,
-    viewportHeight - 18
-  );
   ctx.restore();
 }
 
 function drawWorldSurfaces() {
   const scale = GAME_CONFIG.cameraZoom;
-  ctx.save();
 
   for (const surface of getWorldSurfaces(state)) {
     const p = worldToScreen(surface.x, surface.y);
@@ -131,237 +132,288 @@ function drawWorldSurfaces() {
     const height = surface.height * scale;
 
     if (
-      p.x > viewportWidth + 100 ||
-      p.x + width < -100 ||
-      p.y > viewportHeight + 100 ||
-      p.y + height < -100
+      p.x > viewportWidth + 120 ||
+      p.x + width < -120 ||
+      p.y > viewportHeight + 120 ||
+      p.y + height < -120
     ) {
       continue;
     }
 
-    if (surface.type === "ground") {
-      drawCityDeckSurface(p, width, height, scale);
-      continue;
-    }
-
     if (surface.type === "platform") {
-      drawFuturePlatformSurface(surface, p, width, height, scale);
-      continue;
+      drawMovingPlatform(p, width, height, scale, surface.motion);
+    } else {
+      drawCorridorShell(p, width, height, scale, surface.type);
     }
+  }
+}
 
-    drawFutureObstacleSurface(surface, p, width, height, scale);
+function drawCorridorShell(p, width, height, scale, type) {
+  ctx.save();
+
+  const roof = type === "ceiling";
+  const gradient = ctx.createLinearGradient(p.x, p.y, p.x, p.y + height);
+  gradient.addColorStop(0, roof ? "#263347" : "#1a2533");
+  gradient.addColorStop(1, roof ? "#121a27" : "#0e1621");
+
+  ctx.fillStyle = gradient;
+  ctx.fillRect(p.x, p.y, width, height);
+
+  const edgeY = roof ? p.y + height - 5 * scale : p.y;
+  ctx.fillStyle = "rgba(77, 215, 255, 0.5)";
+  ctx.fillRect(p.x, edgeY, width, Math.max(2, 4 * scale));
+
+  const panelStep = 112 * scale;
+  ctx.strokeStyle = "rgba(155, 190, 216, 0.1)";
+  ctx.lineWidth = 1;
+
+  for (let x = p.x + panelStep; x < p.x + width; x += panelStep) {
+    ctx.beginPath();
+    ctx.moveTo(x, p.y);
+    ctx.lineTo(x, p.y + height);
+    ctx.stroke();
   }
 
   ctx.restore();
 }
 
-function drawCityDeckSurface(p, width, height, scale) {
-  ctx.fillStyle = "#111722";
-  ctx.fillRect(p.x, p.y, width, height);
+function drawMovingPlatform(p, width, height, scale, motion) {
+  ctx.save();
 
-  ctx.fillStyle = "#253847";
-  ctx.fillRect(p.x, p.y, width, 10 * scale);
+  ctx.shadowColor = "rgba(65, 208, 255, 0.42)";
+  ctx.shadowBlur = 14 * scale;
+  ctx.fillStyle = "#26394a";
+  ctx.strokeStyle = "#67ddff";
+  ctx.lineWidth = Math.max(1, 2 * scale);
+  roundRect(ctx, p.x, p.y, width, height, 7 * scale);
+  ctx.fill();
+  ctx.stroke();
 
-  ctx.fillStyle = "rgba(63, 212, 255, 0.42)";
-  ctx.fillRect(p.x, p.y + 10 * scale, width, 2 * scale);
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = "rgba(145, 234, 255, 0.9)";
+  ctx.fillRect(p.x + 12 * scale, p.y + 5 * scale, Math.max(0, width - 24 * scale), 2 * scale);
 
-  const laneSpacing = 82 * scale;
-  const laneWidth = 30 * scale;
-  for (let x = p.x + 18 * scale; x < p.x + width; x += laneSpacing) {
-    ctx.fillStyle = "rgba(107, 140, 164, 0.16)";
-    ctx.fillRect(x, p.y + 23 * scale, laneWidth, 3 * scale);
+  if (motion) {
+    ctx.fillStyle = "rgba(6, 17, 29, 0.55)";
+    const arrowX = p.x + width * 0.5;
+    const arrowY = p.y + height * 0.55;
+    ctx.beginPath();
+    ctx.moveTo(arrowX, arrowY - 5 * scale);
+    ctx.lineTo(arrowX + 5 * scale, arrowY);
+    ctx.lineTo(arrowX, arrowY + 5 * scale);
+    ctx.lineTo(arrowX - 5 * scale, arrowY);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  ctx.restore();
+}
+
+function drawCheckpoints() {
+  const scale = GAME_CONFIG.cameraZoom;
+
+  for (const checkpoint of getWorldCheckpoints(state)) {
+    const x = worldToScreen(checkpoint.x, 0).x;
+    if (x < -80 || x > viewportWidth + 80) continue;
+
+    const top = worldToScreen(checkpoint.x, -470).y;
+    const bottom = worldToScreen(checkpoint.x, 130).y;
+    const active = checkpoint.index <= state.checkpoint.index;
+
+    ctx.save();
+    ctx.strokeStyle = active
+      ? "rgba(105, 255, 205, 0.72)"
+      : "rgba(100, 198, 255, 0.45)";
+    ctx.lineWidth = 2;
+    ctx.setLineDash([7, 8]);
+    ctx.beginPath();
+    ctx.moveTo(x, top);
+    ctx.lineTo(x, bottom);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    ctx.fillStyle = active
+      ? "rgba(105, 255, 205, 0.86)"
+      : "rgba(142, 218, 255, 0.78)";
+    ctx.font = "700 11px ui-monospace, monospace";
+    ctx.textAlign = "center";
+    ctx.fillText(`CP ${checkpoint.index}`, x, top - 10 * scale);
+    ctx.restore();
   }
 }
 
-function drawFuturePlatformSurface(surface, p, width, height, scale) {
-  if (surface.visual === "hoverCar") {
-    drawHoverCarSurface(p, width, height, scale);
+function drawHazards() {
+  for (const hazard of getWorldHazards(state)) {
+    if (hazard.type === "laser") {
+      drawLaser(hazard);
+    } else {
+      drawSpikes(hazard);
+    }
+  }
+}
+
+function drawSpikes(hazard) {
+  const scale = GAME_CONFIG.cameraZoom;
+  const p = worldToScreen(hazard.x, hazard.y);
+  const width = hazard.width * scale;
+  const height = hazard.height * scale;
+
+  if (
+    p.x > viewportWidth + 80 ||
+    p.x + width < -80 ||
+    p.y > viewportHeight + 80 ||
+    p.y + height < -80
+  ) {
     return;
   }
 
-  const landingPad = surface.visual === "landingPad";
-  ctx.save();
-
-  ctx.shadowColor = landingPad
-    ? "rgba(77, 221, 255, 0.28)"
-    : "rgba(134, 121, 255, 0.22)";
-  ctx.shadowBlur = 13 * scale;
-
-  ctx.fillStyle = landingPad ? "#26394a" : "#30354e";
-  ctx.strokeStyle = landingPad ? "#65dcff" : "#938dff";
-  ctx.lineWidth = Math.max(1, 2 * scale);
-  roundRect(ctx, p.x, p.y, width, height, 6 * scale);
-  ctx.fill();
-  ctx.stroke();
-
-  ctx.shadowBlur = 0;
-  ctx.fillStyle = landingPad
-    ? "rgba(118, 226, 255, 0.82)"
-    : "rgba(184, 174, 255, 0.72)";
-  ctx.fillRect(p.x + 10 * scale, p.y + 4 * scale, Math.max(0, width - 20 * scale), 2 * scale);
-
-  const panelWidth = 34 * scale;
-  for (let x = p.x + 16 * scale; x < p.x + width - 12 * scale; x += 52 * scale) {
-    ctx.fillStyle = "rgba(8, 13, 24, 0.42)";
-    ctx.fillRect(x, p.y + 11 * scale, Math.min(panelWidth, p.x + width - x - 8 * scale), 6 * scale);
-  }
-
-  ctx.restore();
-}
-
-function drawHoverCarSurface(p, width, height, scale) {
-  ctx.save();
-
-  ctx.shadowColor = "rgba(71, 202, 255, 0.52)";
-  ctx.shadowBlur = 18 * scale;
-  ctx.fillStyle = "#283747";
-  ctx.strokeStyle = "#71dfff";
-  ctx.lineWidth = Math.max(1, 2 * scale);
-  roundRect(ctx, p.x, p.y, width, height, 12 * scale);
-  ctx.fill();
-  ctx.stroke();
-
-  ctx.shadowBlur = 0;
-  ctx.fillStyle = "#172333";
-  roundRect(
-    ctx,
-    p.x + width * 0.24,
-    p.y + 6 * scale,
-    width * 0.4,
-    Math.max(5 * scale, height * 0.4),
-    8 * scale
-  );
-  ctx.fill();
-
-  ctx.fillStyle = "rgba(135, 229, 255, 0.88)";
-  ctx.fillRect(p.x + 12 * scale, p.y + 4 * scale, Math.max(0, width - 24 * scale), 2 * scale);
-
-  ctx.fillStyle = "rgba(78, 191, 255, 0.55)";
-  const thrusterY = p.y + height + 4 * scale;
-  ctx.fillRect(p.x + width * 0.16, thrusterY, width * 0.2, 3 * scale);
-  ctx.fillRect(p.x + width * 0.64, thrusterY, width * 0.2, 3 * scale);
-
-  ctx.restore();
-}
-
-function drawFutureObstacleSurface(surface, p, width, height, scale) {
-  const isSpire = surface.visual === "spire";
-  const topTrim = Math.max(5 * scale, Math.min(14 * scale, height * 0.04));
+  const ceiling = hazard.type === "ceilingSpikes";
+  const spikeWidth = Math.max(12, 24 * scale);
+  const count = Math.max(1, Math.ceil(width / spikeWidth));
+  const actualWidth = width / count;
 
   ctx.save();
+  ctx.fillStyle = "#c7d5e3";
+  ctx.strokeStyle = "rgba(255, 94, 105, 0.72)";
+  ctx.lineWidth = 1.2;
 
-  const gradient = ctx.createLinearGradient(p.x, 0, p.x + width, 0);
-  gradient.addColorStop(0, isSpire ? "#252a44" : "#202b3a");
-  gradient.addColorStop(0.55, isSpire ? "#343956" : "#2b3b4d");
-  gradient.addColorStop(1, "#17212e");
-  ctx.fillStyle = gradient;
-  ctx.strokeStyle = isSpire ? "#827cff" : "#4ed5ff";
-  ctx.lineWidth = Math.max(1, 2 * scale);
-  roundRect(ctx, p.x, p.y, width, height, 5 * scale);
-  ctx.fill();
-  ctx.stroke();
+  for (let i = 0; i < count; i += 1) {
+    const left = p.x + i * actualWidth;
+    ctx.beginPath();
 
-  ctx.fillStyle = isSpire
-    ? "rgba(143, 129, 255, 0.9)"
-    : "rgba(75, 220, 255, 0.9)";
-  ctx.fillRect(p.x + 6 * scale, p.y + topTrim, 3 * scale, Math.max(0, height - topTrim * 2));
-
-  const visibleTop = Math.max(p.y + 28 * scale, -30);
-  const visibleBottom = Math.min(p.y + height - 22 * scale, viewportHeight + 30);
-  const rowStep = 40 * scale;
-  const columnStep = 34 * scale;
-  const windowWidth = 13 * scale;
-  const windowHeight = 7 * scale;
-
-  for (let y = visibleTop; y < visibleBottom; y += rowStep) {
-    for (let x = p.x + 22 * scale; x < p.x + width - 14 * scale; x += columnStep) {
-      ctx.fillStyle =
-        (Math.floor((x + y) / Math.max(1, 22 * scale)) % 3 === 0)
-          ? "rgba(255, 215, 122, 0.52)"
-          : "rgba(91, 188, 230, 0.28)";
-      ctx.fillRect(x, y, Math.min(windowWidth, p.x + width - x - 8 * scale), windowHeight);
+    if (ceiling) {
+      ctx.moveTo(left, p.y);
+      ctx.lineTo(left + actualWidth * 0.5, p.y + height);
+      ctx.lineTo(left + actualWidth, p.y);
+    } else {
+      ctx.moveTo(left, p.y + height);
+      ctx.lineTo(left + actualWidth * 0.5, p.y);
+      ctx.lineTo(left + actualWidth, p.y + height);
     }
-  }
 
-  ctx.shadowColor = isSpire
-    ? "rgba(141, 121, 255, 0.48)"
-    : "rgba(64, 211, 255, 0.48)";
-  ctx.shadowBlur = 14 * scale;
-  ctx.fillStyle = isSpire ? "#8f80ff" : "#62ddff";
-  ctx.fillRect(p.x + 8 * scale, p.y + 5 * scale, Math.max(0, width - 16 * scale), 3 * scale);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+  }
 
   ctx.restore();
 }
 
-function drawNpcs() {
+function drawLaser(hazard) {
+  const scale = GAME_CONFIG.cameraZoom;
+  const p = worldToScreen(hazard.x, hazard.y);
+  const width = Math.max(3, hazard.width * scale);
+  const height = hazard.height * scale;
+
+  if (
+    p.x > viewportWidth + 90 ||
+    p.x + width < -90 ||
+    p.y > viewportHeight + 90 ||
+    p.y + height < -90
+  ) {
+    return;
+  }
+
+  ctx.save();
+
+  const emitterRadius = 10 * scale;
+  ctx.fillStyle = "#263444";
+  ctx.strokeStyle = hazard.active ? "#ff7a87" : "#61778d";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(p.x + width * 0.5, p.y - 8 * scale, emitterRadius, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(p.x + width * 0.5, p.y + height + 8 * scale, emitterRadius, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+
+  if (hazard.active) {
+    ctx.globalCompositeOperation = "lighter";
+    ctx.shadowColor = "rgba(255, 70, 96, 0.95)";
+    ctx.shadowBlur = 18;
+    ctx.fillStyle = "rgba(255, 67, 91, 0.9)";
+    ctx.fillRect(p.x, p.y, width, height);
+    ctx.fillStyle = "rgba(255, 225, 230, 0.94)";
+    ctx.fillRect(p.x + width * 0.35, p.y, Math.max(1, width * 0.3), height);
+  } else {
+    ctx.strokeStyle = "rgba(255, 102, 123, 0.18)";
+    ctx.setLineDash([5, 9]);
+    ctx.beginPath();
+    ctx.moveTo(p.x + width * 0.5, p.y);
+    ctx.lineTo(p.x + width * 0.5, p.y + height);
+    ctx.stroke();
+  }
+
+  ctx.restore();
+}
+
+function drawDronesAndProjectiles() {
   const scale = GAME_CONFIG.cameraZoom;
 
-  for (const npc of getWorldNpcs(state)) {
-    const p = worldToScreen(npc.x, npc.y);
-    if (p.x < -70 || p.x > viewportWidth + 70 || p.y < -90 || p.y > viewportHeight + 80) {
+  for (const drone of getWorldDrones(state)) {
+    const p = worldToScreen(drone.x, drone.y);
+    if (p.x < -80 || p.x > viewportWidth + 80 || p.y < -80 || p.y > viewportHeight + 80) {
       continue;
     }
 
-    const facing = npc.direction < 0 ? -1 : 1;
-    const walking = npc.mode === "walking";
-    const thrown = npc.mode === "thrown";
-    const fallen = npc.mode === "fallen";
-    const stride = walking
-      ? Math.sin(state.animation.clock * (4.2 + npc.speed * 0.035) + npc.x * 0.018)
-      : 0;
-    const armSwing = stride * 7;
-    const legSwing = stride * 9;
+    const radius = DRONE_CONFIG.radius * scale;
+    const angle = state.animation.clock * 1.8 + drone.phase;
 
     ctx.save();
     ctx.translate(p.x, p.y);
-    ctx.scale(scale, scale);
+    ctx.rotate(Math.sin(angle) * 0.08);
 
-    if (thrown) {
-      ctx.translate(0, -24);
-      ctx.rotate(npc.rotation);
-      ctx.translate(0, 24);
-    } else if (fallen) {
-      const fade = Math.max(
-        0,
-        Math.min(1, npc.behaviorTimer / NPC_CONFIG.fallenDespawnDelay)
-      );
-      ctx.globalAlpha = fade;
-      ctx.translate(0, -4);
-      ctx.rotate(npc.rotation);
-    }
-
-    ctx.strokeStyle = npc.hitFlash > 0 ? "#ffd56a" : "#f29b72";
-    ctx.fillStyle = npc.hitFlash > 0 ? "#fff0b2" : "#ffd0b8";
-    ctx.lineWidth = 4;
-    ctx.lineCap = "round";
-    ctx.lineJoin = "round";
+    ctx.shadowColor = "rgba(255, 113, 136, 0.45)";
+    ctx.shadowBlur = 12;
+    ctx.fillStyle = "#273443";
+    ctx.strokeStyle = "#ff8799";
+    ctx.lineWidth = 2;
 
     ctx.beginPath();
-    ctx.arc(0, -48, 8, 0, Math.PI * 2);
+    ctx.moveTo(0, -radius);
+    ctx.lineTo(radius * 1.25, 0);
+    ctx.lineTo(0, radius);
+    ctx.lineTo(-radius * 1.25, 0);
+    ctx.closePath();
     ctx.fill();
-
-    ctx.beginPath();
-    ctx.moveTo(0, -40);
-    ctx.lineTo(0, -18);
-
-    ctx.moveTo(0, -35);
-    ctx.lineTo(-facing * 11 - armSwing, -25);
-    ctx.moveTo(0, -35);
-    ctx.lineTo(facing * 11 + armSwing, -25);
-
-    ctx.moveTo(0, -18);
-    ctx.lineTo(-facing * 8 - legSwing, 0);
-    ctx.moveTo(0, -18);
-    ctx.lineTo(facing * 8 + legSwing, 0);
     ctx.stroke();
 
-    ctx.fillStyle = "rgba(20, 25, 35, 0.72)";
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = "#ff536d";
     ctx.beginPath();
-    ctx.arc(facing * 3, -49, 1.4, 0, Math.PI * 2);
+    ctx.arc(0, 0, radius * 0.28, 0, Math.PI * 2);
     ctx.fill();
+
+    ctx.strokeStyle = "rgba(146, 217, 255, 0.48)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(0, 0, radius * 1.65, angle, angle + Math.PI * 1.2);
+    ctx.stroke();
 
     ctx.restore();
   }
+
+  ctx.save();
+  ctx.globalCompositeOperation = "lighter";
+
+  for (const projectile of getWorldProjectiles(state)) {
+    const p = worldToScreen(projectile.x, projectile.y);
+    if (p.x < -40 || p.x > viewportWidth + 40 || p.y < -40 || p.y > viewportHeight + 40) {
+      continue;
+    }
+
+    const radius = DRONE_CONFIG.projectileRadius * scale;
+    ctx.shadowColor = "rgba(255, 73, 101, 0.9)";
+    ctx.shadowBlur = 10;
+    ctx.fillStyle = "#ff8a9b";
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, radius, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  ctx.restore();
 }
 
 function drawTrail() {
@@ -376,14 +428,14 @@ function drawTrail() {
     const b = worldToScreen(trail[i].x, trail[i].y);
     const age = i / trail.length;
 
-    ctx.strokeStyle = `rgba(68, 178, 255, ${age * 0.24})`;
+    ctx.strokeStyle = `rgba(68, 178, 255, ${age * 0.23})`;
     ctx.lineWidth = 8 * age + 1;
     ctx.beginPath();
     ctx.moveTo(a.x, a.y);
     ctx.lineTo(b.x, b.y);
     ctx.stroke();
 
-    ctx.strokeStyle = `rgba(181, 233, 255, ${age * 0.58})`;
+    ctx.strokeStyle = `rgba(181, 233, 255, ${age * 0.56})`;
     ctx.lineWidth = 2.2 * age + 0.6;
     ctx.beginPath();
     ctx.moveTo(a.x, a.y);
@@ -398,10 +450,7 @@ function drawAimGuide() {
   if (state.mode !== "aiming" && state.mode !== "airAiming") return;
 
   const aim = getLaunchVector(state);
-  const origin =
-    state.mode === "airAiming"
-      ? worldToScreen(state.orb.x, state.orb.y)
-      : worldToScreen(state.player.x, state.player.y - 28);
+  const origin = worldToScreen(state.orb.x, state.orb.y);
   const guideLength = 95 + aim.power * 150;
   const endX = origin.x + aim.x * guideLength;
   const endY = origin.y + aim.y * guideLength;
@@ -422,12 +471,6 @@ function drawAimGuide() {
   ctx.arc(endX, endY, 5 + aim.power * 3, 0, Math.PI * 2);
   ctx.fill();
 
-  ctx.strokeStyle = "rgba(188, 236, 255, 0.68)";
-  ctx.lineWidth = 1.5;
-  ctx.beginPath();
-  ctx.arc(endX, endY, 13, 0, Math.PI * 2);
-  ctx.stroke();
-
   const barWidth = 104;
   const barX = origin.x - barWidth * 0.5;
   const barY = origin.y + 46;
@@ -442,101 +485,19 @@ function drawAimGuide() {
   ctx.restore();
 }
 
-function drawReformPulse() {
-  if (state.animation.reformPulse <= 0) return;
-
-  const p = worldToScreen(state.player.x, state.player.y - 28);
-  const progress = 1 - state.animation.reformPulse;
-  const radius = 18 + progress * 54;
-
-  ctx.save();
-  ctx.strokeStyle = `rgba(78, 190, 255, ${state.animation.reformPulse * 0.72})`;
-  ctx.lineWidth = 3;
-  ctx.beginPath();
-  ctx.arc(p.x, p.y, radius * GAME_CONFIG.cameraZoom, 0, Math.PI * 2);
-  ctx.stroke();
-  ctx.restore();
-}
-
-function drawPlayer() {
-  if (state.mode === "orb" || state.mode === "airAiming") return;
-
-  const p = worldToScreen(state.player.x, state.player.y);
-  const scale = GAME_CONFIG.cameraZoom;
-  const aiming = state.mode === "aiming";
-  const aim = getLaunchVector(state);
-  const facing = aim.x < -0.05 ? -1 : 1;
-  const lean = aiming ? aim.x * 3.5 * state.launch.power : 0;
-
-  ctx.save();
-  ctx.translate(p.x, p.y);
-  ctx.scale(scale, scale);
-
-  if (aiming) {
-    const aura = 18 + state.launch.power * 18;
-    ctx.strokeStyle = `rgba(70, 187, 255, ${0.22 + state.launch.power * 0.45})`;
-    ctx.lineWidth = 2;
-    for (let i = 0; i < 3; i += 1) {
-      ctx.beginPath();
-      ctx.arc(0, -29, aura + i * 7, 0, Math.PI * 2);
-      ctx.stroke();
-    }
-  }
-
-  ctx.strokeStyle = "#eef3ff";
-  ctx.fillStyle = "#eef3ff";
-  ctx.lineWidth = 4;
-  ctx.lineCap = "round";
-  ctx.lineJoin = "round";
-
-  ctx.beginPath();
-  ctx.arc(lean * 0.25, -51, 8, 0, Math.PI * 2);
-  ctx.fill();
-
-  ctx.beginPath();
-  ctx.moveTo(lean * 0.15, -42);
-  ctx.lineTo(-lean * 0.12, -18);
-
-  if (aiming) {
-    ctx.moveTo(lean * 0.05, -36);
-    ctx.lineTo(-facing * 9, -29);
-    ctx.lineTo(-facing * 15, -20);
-    ctx.moveTo(lean * 0.05, -36);
-    ctx.lineTo(facing * 10, -30);
-    ctx.lineTo(facing * 16, -22);
-  } else {
-    ctx.moveTo(0, -35);
-    ctx.lineTo(-10, -27);
-    ctx.moveTo(0, -35);
-    ctx.lineTo(10, -27);
-  }
-
-  ctx.moveTo(-lean * 0.12, -18);
-  ctx.lineTo(-9, 0);
-  ctx.moveTo(-lean * 0.12, -18);
-  ctx.lineTo(9, 0);
-  ctx.stroke();
-
-  if (aiming) {
-    ctx.fillStyle = "rgba(116, 211, 255, 0.9)";
-    ctx.beginPath();
-    ctx.arc(0, -31, 3 + state.launch.power * 4, 0, Math.PI * 2);
-    ctx.fill();
-  }
-
-  ctx.restore();
-}
-
 function drawOrb() {
-  if ((state.mode !== "orb" && state.mode !== "airAiming") || !state.orb.active) return;
+  if (!state.orb.active) return;
 
   const p = worldToScreen(state.orb.x, state.orb.y);
   const scale = GAME_CONFIG.cameraZoom;
   const radius = GAME_CONFIG.orbRadius * scale;
   const phase = state.animation.clock;
   const pulse = 1 + Math.sin(phase * 11) * 0.08;
+  const invulnerable = state.orb.invulnerability > 0;
+  const alpha = invulnerable && Math.floor(phase * 12) % 2 === 0 ? 0.42 : 1;
 
   ctx.save();
+  ctx.globalAlpha = alpha;
   ctx.globalCompositeOperation = "lighter";
   ctx.shadowColor = "rgba(72, 190, 255, 0.95)";
   ctx.shadowBlur = 24;
@@ -604,7 +565,7 @@ function drawTimeFreezeField() {
   const phase = state.animation.clock;
 
   ctx.save();
-  ctx.fillStyle = "rgba(8, 18, 35, 0.2)";
+  ctx.fillStyle = "rgba(8, 18, 35, 0.22)";
   ctx.fillRect(0, 0, viewportWidth, viewportHeight);
 
   ctx.strokeStyle = "rgba(132, 222, 255, 0.34)";
@@ -619,83 +580,110 @@ function drawTimeFreezeField() {
   ctx.restore();
 }
 
+function drawEventPulse() {
+  if (
+    state.animation.deathPulse <= 0 &&
+    state.animation.checkpointPulse <= 0 &&
+    state.animation.runResetPulse <= 0
+  ) {
+    return;
+  }
+
+  ctx.save();
+
+  if (state.animation.runResetPulse > 0) {
+    ctx.fillStyle = `rgba(255, 68, 92, ${state.animation.runResetPulse * 0.12})`;
+    ctx.fillRect(0, 0, viewportWidth, viewportHeight);
+  } else if (state.animation.deathPulse > 0) {
+    ctx.fillStyle = `rgba(255, 72, 96, ${state.animation.deathPulse * 0.1})`;
+    ctx.fillRect(0, 0, viewportWidth, viewportHeight);
+  }
+
+  if (state.animation.checkpointPulse > 0) {
+    ctx.strokeStyle = `rgba(103, 255, 205, ${state.animation.checkpointPulse * 0.55})`;
+    ctx.lineWidth = 3;
+    ctx.strokeRect(8, 8, viewportWidth - 16, viewportHeight - 16);
+  }
+
+  ctx.restore();
+}
+
 function render() {
   drawBackground();
   drawWorldSurfaces();
-  drawNpcs();
+  drawCheckpoints();
+  drawHazards();
+  drawDronesAndProjectiles();
   drawTrail();
   drawTimeFreezeField();
   drawAimGuide();
-  drawReformPulse();
-  drawPlayer();
   drawOrb();
+  drawEventPulse();
 }
 
 function updateHud() {
-  const progressMetres = Math.max(0, Math.round(state.world.maxProgressX / 10));
   const snapshot = [
     state.mode,
+    state.lives,
     state.burstCount,
-    state.score.npcHits,
-    progressMetres,
-    Math.round(state.launch.power * 100)
+    state.progress.currentMetres,
+    state.progress.furthestMetres,
+    bestDistanceMetres,
+    state.checkpoint.index,
+    state.progress.difficultyLevel,
+    Math.round(state.launch.power * 100),
+    Math.round(state.animation.deathPulse * 10),
+    Math.round(state.animation.runResetPulse * 10)
   ].join("|");
 
   if (snapshot === lastHudSnapshot) return;
   lastHudSnapshot = snapshot;
 
+  const runStats =
+    `LIVES ${state.lives} · ${state.progress.currentMetres}m · ` +
+    `RECORD ${bestDistanceMetres}m · CP ${state.checkpoint.index} · ` +
+    `LEVEL ${state.progress.difficultyLevel}`;
+
+  if (state.animation.runResetPulse > 0.35) {
+    statusNode.textContent = `RUN RESET · ${runStats}`;
+    hintNode.textContent =
+      "All seven lives were used. The run restarted automatically from the beginning.";
+    return;
+  }
+
+  if (state.animation.deathPulse > 0.4) {
+    statusNode.textContent = `RESPAWNED · ${runStats}`;
+    hintNode.textContent =
+      "Hazard hit. You respawned at your latest checkpoint with brief protection.";
+    return;
+  }
+
   if (state.mode === "aiming") {
     statusNode.textContent =
-      "AIMING · POWER " +
-      Math.round(state.launch.power * 100) +
-      "% · HITS " +
-      state.score.npcHits +
-      " · " +
-      progressMetres +
-      "m";
+      `AIMING · POWER ${Math.round(state.launch.power * 100)}% · ${runStats}`;
     hintNode.textContent =
-      "Drag in the direction you want to travel, then release to transform and launch.";
+      "Drag in the direction you want the orb to travel, then release.";
     return;
   }
 
   if (state.mode === "airAiming") {
     statusNode.textContent =
-      "TIME FROZEN · REDIRECT · POWER " +
-      Math.round(state.launch.power * 100) +
-      "% · HITS " +
-      state.score.npcHits +
-      " · " +
-      progressMetres +
-      "m";
+      `TIME FROZEN · POWER ${Math.round(state.launch.power * 100)}% · ${runStats}`;
     hintNode.textContent =
-      "Time is frozen. Drag a new direction and release to redirect the orb.";
+      "Everything is frozen. Drag a new direction and release to redirect the same orb.";
     return;
   }
 
   if (state.mode === "orb") {
-    statusNode.textContent =
-      "ENERGY FORM · BURST " +
-      state.burstCount +
-      " · HITS " +
-      state.score.npcHits +
-      " · " +
-      progressMetres +
-      "m";
+    statusNode.textContent = `ENERGY FORM · ${runStats}`;
     hintNode.textContent =
-      "Tap and hold mid-air to freeze time and re-aim. Sides and undersides still bounce.";
+      "Keep bouncing. Tap and hold mid-air to freeze and redirect around lasers, spikes and drones.";
     return;
   }
 
-  statusNode.textContent =
-    "READY · BURSTS " +
-    state.burstCount +
-    " · HITS " +
-    state.score.npcHits +
-    " · " +
-    progressMetres +
-    "m";
+  statusNode.textContent = `ORB READY · ${runStats}`;
   hintNode.textContent =
-    "Press anywhere, drag in the direction you want to move, then release.";
+    "The orb stays transformed. Drag to launch; it will keep bouncing until its momentum fades.";
 }
 
 function recordTrail() {
@@ -704,8 +692,16 @@ function recordTrail() {
   const previous = trail.at(-1);
   if (!previous || Math.hypot(state.orb.x - previous.x, state.orb.y - previous.y) > 8) {
     trail.push({ x: state.orb.x, y: state.orb.y });
-    if (trail.length > 34) trail.shift();
+    if (trail.length > 38) trail.shift();
   }
+}
+
+function updateRecord() {
+  if (state.progress.furthestMetres <= bestDistanceMetres) return;
+
+  bestDistanceMetres = state.progress.furthestMetres;
+  saveBestDistance(bestDistanceMetres);
+  lastHudSnapshot = "";
 }
 
 function frame(now) {
@@ -715,14 +711,16 @@ function frame(now) {
   lastTime = now;
 
   stepGame(state, reduceMotion ? Math.min(dt, 1 / 30) : dt);
-  recordTrail();
 
-  if (
-    state.mode !== "orb" &&
-    state.mode !== "airAiming" &&
-    state.animation.reformPulse <= 0.15 &&
-    trail.length > 0
-  ) {
+  if (state.run.respawnSerial !== lastRespawnSerial) {
+    lastRespawnSerial = state.run.respawnSerial;
+    trail = [];
+  }
+
+  recordTrail();
+  updateRecord();
+
+  if (state.mode === "ready" && trail.length > 0) {
     trail.shift();
   }
 
@@ -781,11 +779,29 @@ canvas.addEventListener("pointercancel", (event) => {
 resetButton.addEventListener("click", () => {
   state = createGameState();
   trail = [];
+  lastRespawnSerial = state.run.respawnSerial;
   lastHudSnapshot = "";
   updateHud();
 });
 
 window.addEventListener("resize", resizeCanvas);
+
+function loadBestDistance() {
+  try {
+    const value = Number.parseInt(window.localStorage.getItem(RECORD_KEY) || "0", 10);
+    return Number.isFinite(value) && value > 0 ? value : 0;
+  } catch {
+    return 0;
+  }
+}
+
+function saveBestDistance(value) {
+  try {
+    window.localStorage.setItem(RECORD_KEY, String(value));
+  } catch {
+    // Record persistence is optional; gameplay must continue if storage is unavailable.
+  }
+}
 
 function roundRect(context, x, y, width, height, radius) {
   const r = Math.min(radius, Math.abs(width) * 0.5, Math.abs(height) * 0.5);

@@ -5,9 +5,7 @@
   color: #f6f7fb;
 }
 
-* {
-  box-sizing: border-box;
-}
+* { box-sizing: border-box; }
 
 html,
 body {
@@ -18,14 +16,10 @@ body {
   overscroll-behavior: none;
 }
 
-body {
-  overflow: hidden;
-}
+body { overflow: hidden; }
 
 button,
-canvas {
-  -webkit-tap-highlight-color: transparent;
-}
+canvas { -webkit-tap-highlight-color: transparent; }
 
 .game-shell {
   position: relative;
@@ -59,7 +53,7 @@ canvas {
 .hud-copy {
   display: grid;
   gap: 3px;
-  max-width: min(78vw, 520px);
+  max-width: min(82vw, 620px);
   padding: 10px 12px;
   border: 1px solid rgb(255 255 255 / 12%);
   border-radius: 12px;
@@ -69,7 +63,7 @@ canvas {
 
 #status {
   font-size: 12px;
-  letter-spacing: 0.16em;
+  letter-spacing: 0.12em;
   color: #ffd56a;
 }
 
@@ -92,9 +86,7 @@ canvas {
   pointer-events: auto;
 }
 
-#resetButton:active {
-  transform: translateY(1px);
-}
+#resetButton:active { transform: translateY(1px); }
 
 .prototype-tag {
   position: absolute;
@@ -110,17 +102,10 @@ canvas {
 }
 
 @media (max-width: 480px) {
-  .hud-copy {
-    max-width: calc(100vw - 98px);
-  }
-
-  #hint {
-    font-size: 12px;
-  }
+  .hud-copy { max-width: calc(100vw - 98px); }
+  #hint { font-size: 12px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  #resetButton:active {
-    transform: none;
-  }
+  #resetButton:active { transform: none; }
 }

@@ -1,4 +1,6 @@
 const GROUND_TOP = 180;
+const CEILING_BOTTOM = -520;
+const START_POSITION = Object.freeze({ x: -120, y: GROUND_TOP - 16 });
 
 export const GAME_CONFIG = Object.freeze({
   orbGravity: 240,
@@ -8,259 +10,64 @@ export const GAME_CONFIG = Object.freeze({
   aimDeadzone: 14,
   orbRadius: 16,
   maxOrbSpeed: 1180,
-  bounceRestitution: 0.78,
-  bounceSeparation: 1.25,
+  bounceRestitution: 0.8,
+  bounceTangentialDamping: 0.97,
+  bounceSeparation: 1.5,
+  restSpeedThreshold: 105,
   cameraSharpness: 10,
-  cameraZoom: 0.78
+  cameraZoom: 0.78,
+  respawnInvulnerability: 0.9,
+  startingLives: 7
 });
 
 export const WORLD_CONFIG = Object.freeze({
   seed: 2000,
   groundTop: GROUND_TOP,
-  groundDepth: 620,
-  proceduralStartX: 1600,
+  ceilingBottom: CEILING_BOTTOM,
+  structuralThickness: 90,
+  proceduralStartX: 1200,
   chunkWidth: 820,
   chunksBehind: 2,
-  chunksAhead: 4
+  chunksAhead: 4,
+  checkpointInset: 86,
+  checkpointSafeRadius: 190,
+  worldKillMargin: 180
 });
 
-export const CITY_CONFIG = Object.freeze({
-  minTowerHeight: 1120,
-  maxTowerHeight: 1540,
-  difficultyTowerGrowth: 180,
-  platformDifficultyLift: 110
+export const HAZARD_CONFIG = Object.freeze({
+  pitMinWidth: 118,
+  pitMaxWidth: 188,
+  floorSpikeHeight: 54,
+  ceilingSpikeHeight: 56,
+  laserWidth: 12,
+  laserMoveRange: 86,
+  laserBaseCycle: 2.8,
+  laserMinimumCycle: 1.35,
+  laserBaseActiveRatio: 0.5,
+  laserMaxActiveRatio: 0.68,
+  movingPlatformWidth: 170,
+  movingPlatformHeight: 30,
+  movingPlatformRange: 78,
+  movingPlatformBaseSpeed: 0.95,
+  difficultyCap: 10
 });
 
-export const NPC_CONFIG = Object.freeze({
-  width: 28,
-  height: 56,
-  perChunk: 2,
-  minWalkSpeed: 24,
-  maxWalkSpeed: 42,
-  gravity: 680,
-  hitVelocityScale: 0.58,
-  hitLift: 170,
-  orbCarryThrough: 0.9,
-  fallenDespawnDelay: 0.18
+export const DRONE_CONFIG = Object.freeze({
+  radius: 18,
+  basePerChunk: 1,
+  maxPerChunk: 3,
+  minSpeed: 210,
+  maxSpeed: 390,
+  acquireRange: 760,
+  baseFireInterval: 1.9,
+  minFireInterval: 0.78,
+  projectileRadius: 6,
+  projectileBaseSpeed: 430,
+  projectileMaxSpeed: 680,
+  projectileLifetime: 3.2,
+  maxProjectiles: 28,
+  corridorPadding: 72
 });
-
-const STARTER_NPCS = Object.freeze([
-  Object.freeze({
-    id: "starter-npc-0",
-    chunkIndex: null,
-    x: 80,
-    y: GROUND_TOP,
-    patrolMin: 24,
-    patrolMax: 255,
-    direction: 1,
-    speed: 28,
-    mode: "idle",
-    behaviorTimer: 1.15,
-    behaviorSeed: 0.22,
-    behaviorPhase: 0,
-    vx: 0,
-    vy: 0,
-    rotation: 0,
-    rotationVelocity: 0,
-    hitFlash: 0
-  }),
-  Object.freeze({
-    id: "starter-npc-1",
-    chunkIndex: null,
-    x: 620,
-    y: GROUND_TOP,
-    patrolMin: 520,
-    patrolMax: 760,
-    direction: -1,
-    speed: 34,
-    mode: "walking",
-    behaviorTimer: 2.6,
-    behaviorSeed: 0.63,
-    behaviorPhase: 0,
-    vx: 0,
-    vy: 0,
-    rotation: 0,
-    rotationVelocity: 0,
-    hitFlash: 0
-  }),
-  Object.freeze({
-    id: "starter-npc-2",
-    chunkIndex: null,
-    x: 1240,
-    y: GROUND_TOP,
-    patrolMin: 1120,
-    patrolMax: 1400,
-    direction: 1,
-    speed: 31,
-    mode: "walking",
-    behaviorTimer: 1.9,
-    behaviorSeed: 0.41,
-    behaviorPhase: 0,
-    vx: 0,
-    vy: 0,
-    rotation: 0,
-    rotationVelocity: 0,
-    hitFlash: 0
-  })
-]);
-
-export const STARTER_SURFACES = Object.freeze([
-  Object.freeze({
-    id: "starter-ground",
-    type: "ground",
-    visual: "cityDeck",
-    x: -1800,
-    y: GROUND_TOP,
-    width: WORLD_CONFIG.proceduralStartX + 1800,
-    height: WORLD_CONFIG.groundDepth
-  }),
-  Object.freeze({
-    id: "platform-a",
-    type: "platform",
-    visual: "hoverCar",
-    x: 70,
-    y: 88,
-    width: 180,
-    height: 28
-  }),
-  Object.freeze({
-    id: "wall-a",
-    type: "obstacle",
-    visual: "tower",
-    x: 340,
-    y: GROUND_TOP - 1180,
-    width: 118,
-    height: 1180
-  }),
-  Object.freeze({
-    id: "platform-b",
-    type: "platform",
-    visual: "landingPad",
-    x: 510,
-    y: -330,
-    width: 230,
-    height: 30
-  }),
-  Object.freeze({
-    id: "pillar-b",
-    type: "obstacle",
-    visual: "spire",
-    x: 790,
-    y: GROUND_TOP - 1240,
-    width: 92,
-    height: 1240
-  }),
-  Object.freeze({
-    id: "platform-c",
-    type: "platform",
-    visual: "roofDeck",
-    x: 925,
-    y: -210,
-    width: 220,
-    height: 30
-  }),
-  Object.freeze({
-    id: "platform-d",
-    type: "platform",
-    visual: "hoverCar",
-    x: 1190,
-    y: -520,
-    width: 210,
-    height: 30
-  }),
-  Object.freeze({
-    id: "block-d",
-    type: "obstacle",
-    visual: "tower",
-    x: 1460,
-    y: GROUND_TOP - 1360,
-    width: 126,
-    height: 1360
-  })
-]);
-
-const CHUNK_PATTERNS = Object.freeze([
-  Object.freeze([
-    Object.freeze({
-      type: "platform",
-      visual: "landingPad",
-      x: 72,
-      y: -170,
-      width: 190,
-      height: 30
-    }),
-    Object.freeze({ type: "obstacle", visual: "tower", x: 320, width: 116, height: 1180 }),
-    Object.freeze({
-      type: "platform",
-      visual: "hoverCar",
-      x: 488,
-      y: -520,
-      width: 175,
-      height: 28
-    }),
-    Object.freeze({ type: "obstacle", visual: "spire", x: 716, width: 94, height: 1260 })
-  ]),
-  Object.freeze([
-    Object.freeze({ type: "obstacle", visual: "spire", x: 92, width: 96, height: 1160 }),
-    Object.freeze({
-      type: "platform",
-      visual: "roofDeck",
-      x: 235,
-      y: -360,
-      width: 190,
-      height: 30
-    }),
-    Object.freeze({ type: "obstacle", visual: "tower", x: 478, width: 128, height: 1320 }),
-    Object.freeze({
-      type: "platform",
-      visual: "hoverCar",
-      x: 628,
-      y: -610,
-      width: 158,
-      height: 28
-    })
-  ]),
-  Object.freeze([
-    Object.freeze({
-      type: "platform",
-      visual: "hoverCar",
-      x: 58,
-      y: -260,
-      width: 166,
-      height: 28
-    }),
-    Object.freeze({ type: "obstacle", visual: "tower", x: 272, width: 122, height: 1240 }),
-    Object.freeze({
-      type: "platform",
-      visual: "landingPad",
-      x: 438,
-      y: -470,
-      width: 168,
-      height: 30
-    }),
-    Object.freeze({ type: "obstacle", visual: "spire", x: 650, width: 102, height: 1380 })
-  ]),
-  Object.freeze([
-    Object.freeze({ type: "obstacle", visual: "tower", x: 78, width: 120, height: 1200 }),
-    Object.freeze({
-      type: "platform",
-      visual: "landingPad",
-      x: 242,
-      y: -430,
-      width: 188,
-      height: 30
-    }),
-    Object.freeze({
-      type: "platform",
-      visual: "hoverCar",
-      x: 486,
-      y: -650,
-      width: 152,
-      height: 28
-    }),
-    Object.freeze({ type: "obstacle", visual: "tower", x: 680, width: 128, height: 1460 })
-  ])
-]);
 
 const DEFAULT_LAUNCH = Object.freeze({
   dx: 150,
@@ -268,25 +75,130 @@ const DEFAULT_LAUNCH = Object.freeze({
   power: 0.58
 });
 
-const START_POSITION = Object.freeze({ x: -120, y: GROUND_TOP });
+export const STARTER_SURFACES = Object.freeze([
+  Object.freeze({
+    id: "starter-floor-left",
+    type: "floor",
+    visual: "corridorFloor",
+    x: -1800,
+    y: GROUND_TOP,
+    width: 2580,
+    height: WORLD_CONFIG.structuralThickness
+  }),
+  Object.freeze({
+    id: "starter-floor-right",
+    type: "floor",
+    visual: "corridorFloor",
+    x: 920,
+    y: GROUND_TOP,
+    width: WORLD_CONFIG.proceduralStartX - 920,
+    height: WORLD_CONFIG.structuralThickness
+  }),
+  Object.freeze({
+    id: "starter-roof",
+    type: "ceiling",
+    visual: "corridorRoof",
+    x: -1800,
+    y: CEILING_BOTTOM - WORLD_CONFIG.structuralThickness,
+    width: WORLD_CONFIG.proceduralStartX + 1800,
+    height: WORLD_CONFIG.structuralThickness
+  }),
+  Object.freeze({
+    id: "starter-moving-platform",
+    type: "platform",
+    visual: "movingPlatform",
+    x: 500,
+    y: -110,
+    width: HAZARD_CONFIG.movingPlatformWidth,
+    height: HAZARD_CONFIG.movingPlatformHeight,
+    motion: Object.freeze({
+      axis: "y",
+      baseX: 500,
+      baseY: -110,
+      range: 86,
+      speed: 1.05,
+      phase: 0.45
+    })
+  })
+]);
+
+export const STARTER_HAZARDS = Object.freeze([
+  Object.freeze({
+    id: "starter-ceiling-spikes",
+    type: "ceilingSpikes",
+    visual: "spikes",
+    x: 260,
+    y: CEILING_BOTTOM,
+    width: 118,
+    height: HAZARD_CONFIG.ceilingSpikeHeight,
+    active: true
+  }),
+  Object.freeze({
+    id: "starter-pit-spikes",
+    type: "floorSpikes",
+    visual: "spikes",
+    x: 780,
+    y: GROUND_TOP - 34,
+    width: 140,
+    height: HAZARD_CONFIG.floorSpikeHeight + 48,
+    active: true
+  }),
+  Object.freeze({
+    id: "starter-laser",
+    type: "laser",
+    visual: "laser",
+    x: 1060,
+    y: CEILING_BOTTOM + 42,
+    width: HAZARD_CONFIG.laserWidth,
+    height: GROUND_TOP - CEILING_BOTTOM - 84,
+    active: true,
+    motion: Object.freeze({
+      axis: "x",
+      baseX: 1060,
+      baseY: CEILING_BOTTOM + 42,
+      range: 58,
+      speed: 0.72,
+      phase: 1.1
+    }),
+    laser: Object.freeze({
+      cycle: 2.8,
+      activeRatio: 0.5,
+      phaseTime: 0.35
+    })
+  })
+]);
+
+const STARTER_DRONES = Object.freeze([
+  Object.freeze({
+    id: "starter-drone-0",
+    chunkIndex: null,
+    x: 1120,
+    y: -230,
+    homeX: 1120,
+    homeY: -230,
+    difficulty: 1,
+    speed: 220,
+    fireInterval: 1.9,
+    projectileSpeed: 430,
+    cooldown: 1.15,
+    phase: 0.3
+  })
+]);
 
 export function createGameState() {
   const state = {
     mode: "ready",
     burstCount: 0,
-    score: {
-      npcHits: 0
-    },
-    player: { ...START_POSITION },
+    lives: GAME_CONFIG.startingLives,
     orb: {
-      active: false,
+      active: true,
       x: START_POSITION.x,
-      y: START_POSITION.y - 28,
+      y: START_POSITION.y,
       vx: 0,
       vy: 0,
       travel: 0,
-      contact: null,
-      lastBounce: null
+      lastBounce: null,
+      invulnerability: 0
     },
     launch: {
       pointerId: null,
@@ -303,40 +215,65 @@ export function createGameState() {
     animation: {
       clock: 0,
       transformPulse: 0,
-      reformPulse: 0,
-      bouncePulse: 0
+      bouncePulse: 0,
+      deathPulse: 0,
+      checkpointPulse: 0,
+      runResetPulse: 0
     },
-    camera: { ...START_POSITION },
-    world: {
+    camera: { x: START_POSITION.x, y: START_POSITION.y },
+    progress: {
+      startX: START_POSITION.x,
+      currentMetres: 0,
+      furthestMetres: 0,
       maxProgressX: START_POSITION.x,
+      difficultyLevel: 1
+    },
+    checkpoint: {
+      index: 0,
+      x: START_POSITION.x,
+      spawnX: START_POSITION.x,
+      spawnY: START_POSITION.y
+    },
+    run: {
+      deaths: 0,
+      restartCount: 0,
+      respawnSerial: 0,
+      lastDeathCause: null
+    },
+    world: {
+      clock: 0,
       activeStartChunk: null,
       activeEndChunk: null,
       surfaces: [],
-      npcs: [],
-      defeatedNpcIds: new Set()
+      hazards: [],
+      checkpoints: [],
+      drones: [],
+      projectiles: [],
+      projectileSerial: 0
     }
   };
 
   refreshWorldForFocus(state, START_POSITION.x);
+  updateProgress(state);
   return state;
 }
 
 export function beginAim(state, pointerX, pointerY, pointerId = 0) {
-  const beginningFromGround = state.mode === "ready";
-  const beginningFromOrb = state.mode === "orb";
+  const beginningFromRest = state.mode === "ready";
+  const beginningFromFlight = state.mode === "orb";
 
-  if ((!beginningFromGround && !beginningFromOrb) || state.launch.pointerId !== null) {
+  if ((!beginningFromRest && !beginningFromFlight) || state.launch.pointerId !== null) {
     return false;
   }
 
-  state.mode = beginningFromOrb ? "airAiming" : "aiming";
+  state.mode = beginningFromFlight ? "airAiming" : "aiming";
   state.launch.pointerId = pointerId;
   state.launch.startX = pointerX;
   state.launch.startY = pointerY;
   state.launch.currentX = pointerX;
   state.launch.currentY = pointerY;
 
-  if (beginningFromOrb) {
+  if (beginningFromFlight) {
     const speed = Math.hypot(state.orb.vx, state.orb.vy);
     const safeSpeed = Math.max(speed, 1);
     state.launch.dx = (state.orb.vx / safeSpeed) * GAME_CONFIG.maxAimDistance;
@@ -404,24 +341,19 @@ export function releaseAim(state, pointerId = state.launch.pointerId) {
     GAME_CONFIG.minLaunchSpeed +
     state.launch.power * (GAME_CONFIG.maxLaunchSpeed - GAME_CONFIG.minLaunchSpeed);
 
-  state.orb.active = true;
   state.orb.vx = aim.x * speed;
   state.orb.vy = aim.y * speed;
-  state.orb.contact = null;
   state.orb.lastBounce = null;
+  state.orb.active = true;
+  state.mode = "orb";
 
-  if (redirectingMidAir) {
-    state.mode = "orb";
-    return true;
+  if (!redirectingMidAir) {
+    state.orb.travel = 0;
+    state.animation.transformPulse = 1;
+    state.animation.bouncePulse = 0;
+    state.burstCount += 1;
   }
 
-  state.orb.x = state.player.x;
-  state.orb.y = state.player.y - 28;
-  state.orb.travel = 0;
-  state.animation.transformPulse = 1;
-  state.animation.bouncePulse = 0;
-  state.mode = "orb";
-  state.burstCount += 1;
   return true;
 }
 
@@ -444,85 +376,37 @@ export function stepGame(state, deltaSeconds) {
 
   state.animation.clock += dt;
   state.animation.transformPulse = Math.max(0, state.animation.transformPulse - dt * 3.5);
-  state.animation.reformPulse = Math.max(0, state.animation.reformPulse - dt * 3);
   state.animation.bouncePulse = Math.max(0, state.animation.bouncePulse - dt * 5);
+  state.animation.deathPulse = Math.max(0, state.animation.deathPulse - dt * 2.2);
+  state.animation.checkpointPulse = Math.max(0, state.animation.checkpointPulse - dt * 1.8);
+  state.animation.runResetPulse = Math.max(0, state.animation.runResetPulse - dt * 1.5);
 
   const gameplayFrozen = state.mode === "airAiming";
+
   if (!gameplayFrozen) {
-    updateNpcs(state, dt);
-  }
+    state.world.clock += dt;
+    state.orb.invulnerability = Math.max(0, state.orb.invulnerability - dt);
 
-  if (state.mode === "orb") {
-    const startX = state.orb.x;
-    const startY = state.orb.y;
-
-    state.orb.vy += GAME_CONFIG.orbGravity * dt;
-
-    const speed = Math.hypot(state.orb.vx, state.orb.vy);
-    if (speed > GAME_CONFIG.maxOrbSpeed) {
-      const scale = GAME_CONFIG.maxOrbSpeed / speed;
-      state.orb.vx *= scale;
-      state.orb.vy *= scale;
-    }
-
-    const nextX = startX + state.orb.vx * dt;
-    const nextY = startY + state.orb.vy * dt;
-
-    refreshWorldForFocus(state, nextX);
-    const surfaceHit = findEarliestSurfaceCollision(
-      state,
-      startX,
-      startY,
-      nextX,
-      nextY,
-      GAME_CONFIG.orbRadius
-    );
-    const npcHit = findEarliestNpcCollision(state, startX, startY, nextX, nextY);
-
-    if (npcHit && (!surfaceHit || npcHit.t < surfaceHit.t)) {
-      state.orb.x = npcHit.x;
-      state.orb.y = npcHit.y;
-      state.orb.travel += Math.hypot(npcHit.x - startX, npcHit.y - startY);
-      throwNpcWithOrb(state, npcHit.npc);
-      state.orb.vx *= NPC_CONFIG.orbCarryThrough;
-      state.orb.vy *= NPC_CONFIG.orbCarryThrough;
-    } else if (surfaceHit) {
-      state.orb.x = surfaceHit.x;
-      state.orb.y = surfaceHit.y;
-      state.orb.travel += Math.hypot(surfaceHit.x - startX, surfaceHit.y - startY);
-
-      if (isStandableLanding(surfaceHit, state.orb.vy)) {
-        state.orb.vx = 0;
-        state.orb.vy = 0;
-        state.orb.contact = {
-          surfaceId: surfaceHit.surface.id,
-          normalX: surfaceHit.normalX,
-          normalY: surfaceHit.normalY
-        };
-        state.orb.active = false;
-        reformPlayerAtLanding(state, surfaceHit);
-        state.mode = "ready";
-      } else {
-        bounceOrbFromSurface(state, surfaceHit);
-      }
-    } else {
-      state.orb.x = nextX;
-      state.orb.y = nextY;
-      state.orb.travel += Math.hypot(nextX - startX, nextY - startY);
-    }
-  } else if (state.mode === "airAiming") {
     refreshWorldForFocus(state, state.orb.x);
+    updateDynamicWorld(state);
+    updateDrones(state, dt);
+    advanceProjectiles(state, dt);
+
+    if (state.mode === "orb") {
+      simulateOrbFlight(state, dt);
+    } else {
+      resolveStationaryLethalContacts(state);
+    }
+
+    updateProgress(state);
+    updateCheckpointProgress(state);
+    pruneProjectiles(state);
   } else {
-    refreshWorldForFocus(state, state.player.x);
-    state.orb.x = state.player.x;
-    state.orb.y = state.player.y - 28;
+    refreshWorldForFocus(state, state.orb.x);
+    updateDynamicWorld(state);
   }
 
-  const target =
-    state.mode === "orb" || state.mode === "airAiming" ? state.orb : state.player;
-  const cameraBlend = 1 - Math.exp(-GAME_CONFIG.cameraSharpness * dt);
-  state.camera.x += (target.x - state.camera.x) * cameraBlend;
-  state.camera.y += (target.y - state.camera.y) * cameraBlend;
+  updateCamera(state, dt);
 }
 
 export function getLaunchVector(state) {
@@ -538,8 +422,20 @@ export function getWorldSurfaces(state) {
   return state.world.surfaces;
 }
 
-export function getWorldNpcs(state) {
-  return state.world.npcs;
+export function getWorldHazards(state) {
+  return state.world.hazards;
+}
+
+export function getWorldCheckpoints(state) {
+  return state.world.checkpoints;
+}
+
+export function getWorldDrones(state) {
+  return state.world.drones;
+}
+
+export function getWorldProjectiles(state) {
+  return state.world.projectiles;
 }
 
 export function refreshWorldForFocus(state, focusX) {
@@ -555,131 +451,304 @@ export function refreshWorldForFocus(state, focusX) {
     return false;
   }
 
-  const surfaces = [...STARTER_SURFACES];
-  const npcDefinitions = STARTER_NPCS.map((npc) => ({ ...npc }));
+  const surfaces = STARTER_SURFACES.map(cloneWorldItem);
+  const hazards = STARTER_HAZARDS.map(cloneWorldItem);
+  const checkpoints = [];
+  const droneDefinitions = STARTER_DRONES.map((drone) => ({ ...drone }));
 
   for (let chunkIndex = startChunk; chunkIndex <= endChunk; chunkIndex += 1) {
-    const chunkSurfaces = generateWorldChunk(chunkIndex);
-    surfaces.push(...chunkSurfaces);
-    npcDefinitions.push(...generateNpcChunk(chunkIndex, chunkSurfaces));
+    surfaces.push(...generateWorldChunk(chunkIndex));
+    hazards.push(...generateHazardChunk(chunkIndex));
+    checkpoints.push(generateCheckpoint(chunkIndex));
+    droneDefinitions.push(...generateDroneChunk(chunkIndex));
   }
 
   state.world.activeStartChunk = startChunk;
   state.world.activeEndChunk = endChunk;
   state.world.surfaces = surfaces;
-  state.world.npcs = reconcileActiveNpcs(
-    state.world.npcs,
-    npcDefinitions,
-    state.world.defeatedNpcIds
-  );
+  state.world.hazards = hazards;
+  state.world.checkpoints = checkpoints;
+  state.world.drones = reconcileActiveDrones(state.world.drones, droneDefinitions);
+  state.world.projectiles = state.world.projectiles.filter((projectile) => {
+    if (projectile.chunkIndex === null) return true;
+    return projectile.chunkIndex >= startChunk - 1 && projectile.chunkIndex <= endChunk + 1;
+  });
+
+  updateDynamicWorld(state);
   return true;
 }
 
 export function generateWorldChunk(chunkIndex) {
   const safeIndex = Math.max(0, Math.floor(chunkIndex));
   const chunkX = WORLD_CONFIG.proceduralStartX + safeIndex * WORLD_CONFIG.chunkWidth;
-  const patternIndex = Math.floor(seededUnit(safeIndex, 0) * CHUNK_PATTERNS.length);
-  const pattern = CHUNK_PATTERNS[Math.min(CHUNK_PATTERNS.length - 1, patternIndex)];
-  const difficulty = Math.min(1, safeIndex / 12);
-  const surfaces = [
+  const difficulty = difficultyForChunk(safeIndex);
+  const pitWidth =
+    HAZARD_CONFIG.pitMinWidth +
+    Math.round(
+      seededUnit(safeIndex, 2) * (HAZARD_CONFIG.pitMaxWidth - HAZARD_CONFIG.pitMinWidth)
+    );
+  const pitX =
+    chunkX +
+    285 +
+    Math.round(seededUnit(safeIndex, 3) * 185);
+  const safeEnd = chunkX + WORLD_CONFIG.chunkWidth - WORLD_CONFIG.checkpointSafeRadius;
+  const clampedPitX = Math.min(pitX, safeEnd - pitWidth - 28);
+
+  const topPlatformX = chunkX + 155 + Math.round(seededUnit(safeIndex, 6) * 80);
+  const bottomPlatformX = chunkX + 520 + Math.round(seededUnit(safeIndex, 7) * 70);
+  const motionSpeed =
+    HAZARD_CONFIG.movingPlatformBaseSpeed + Math.min(0.75, (difficulty - 1) * 0.07);
+  const motionRange =
+    HAZARD_CONFIG.movingPlatformRange + Math.min(48, (difficulty - 1) * 5);
+
+  return [
     {
-      id: `chunk-${safeIndex}-ground`,
-      type: "ground",
+      id: `chunk-${safeIndex}-floor-a`,
+      type: "floor",
+      visual: "corridorFloor",
       x: chunkX,
       y: GROUND_TOP,
-      width: WORLD_CONFIG.chunkWidth,
-      height: WORLD_CONFIG.groundDepth,
-      visual: "cityDeck",
+      width: Math.max(24, clampedPitX - chunkX),
+      height: WORLD_CONFIG.structuralThickness,
       chunkIndex: safeIndex
+    },
+    {
+      id: `chunk-${safeIndex}-floor-b`,
+      type: "floor",
+      visual: "corridorFloor",
+      x: clampedPitX + pitWidth,
+      y: GROUND_TOP,
+      width: chunkX + WORLD_CONFIG.chunkWidth - (clampedPitX + pitWidth),
+      height: WORLD_CONFIG.structuralThickness,
+      chunkIndex: safeIndex
+    },
+    {
+      id: `chunk-${safeIndex}-roof`,
+      type: "ceiling",
+      visual: "corridorRoof",
+      x: chunkX,
+      y: CEILING_BOTTOM - WORLD_CONFIG.structuralThickness,
+      width: WORLD_CONFIG.chunkWidth,
+      height: WORLD_CONFIG.structuralThickness,
+      chunkIndex: safeIndex
+    },
+    makeMovingPlatform(
+      `chunk-${safeIndex}-top-platform`,
+      safeIndex,
+      topPlatformX,
+      CEILING_BOTTOM + 126,
+      "y",
+      motionRange,
+      motionSpeed,
+      seededUnit(safeIndex, 8) * Math.PI * 2
+    ),
+    makeMovingPlatform(
+      `chunk-${safeIndex}-bottom-platform`,
+      safeIndex,
+      bottomPlatformX,
+      GROUND_TOP - 178,
+      "y",
+      motionRange * 0.82,
+      motionSpeed * 1.08,
+      seededUnit(safeIndex, 9) * Math.PI * 2
+    )
+  ];
+}
+
+export function generateHazardChunk(chunkIndex) {
+  const safeIndex = Math.max(0, Math.floor(chunkIndex));
+  const chunkX = WORLD_CONFIG.proceduralStartX + safeIndex * WORLD_CONFIG.chunkWidth;
+  const difficulty = difficultyForChunk(safeIndex);
+  const surfaces = generateWorldChunk(safeIndex);
+  const floorA = surfaces.find((surface) => surface.id.endsWith("floor-a"));
+  const floorB = surfaces.find((surface) => surface.id.endsWith("floor-b"));
+  const pitX = floorA.x + floorA.width;
+  const pitWidth = floorB.x - pitX;
+
+  const ceilingSpikeWidth = 92 + Math.round(seededUnit(safeIndex, 12) * 54);
+  const ceilingSpikeX =
+    chunkX + 90 + Math.round(seededUnit(safeIndex, 13) * 150);
+
+  const cycle = Math.max(
+    HAZARD_CONFIG.laserMinimumCycle,
+    HAZARD_CONFIG.laserBaseCycle - (difficulty - 1) * 0.12
+  );
+  const activeRatio = Math.min(
+    HAZARD_CONFIG.laserMaxActiveRatio,
+    HAZARD_CONFIG.laserBaseActiveRatio + (difficulty - 1) * 0.018
+  );
+  const laserX = chunkX + 555 + Math.round(seededUnit(safeIndex, 14) * 60);
+  const laserRange =
+    HAZARD_CONFIG.laserMoveRange + Math.min(50, (difficulty - 1) * 4);
+  const laserSpeed = 0.72 + Math.min(0.68, (difficulty - 1) * 0.055);
+
+  const hazards = [
+    {
+      id: `chunk-${safeIndex}-pit-spikes`,
+      type: "floorSpikes",
+      visual: "spikes",
+      x: pitX,
+      y: GROUND_TOP - 34,
+      width: pitWidth,
+      height: HAZARD_CONFIG.floorSpikeHeight + 48,
+      active: true,
+      chunkIndex: safeIndex,
+      difficulty
+    },
+    {
+      id: `chunk-${safeIndex}-ceiling-spikes-0`,
+      type: "ceilingSpikes",
+      visual: "spikes",
+      x: ceilingSpikeX,
+      y: CEILING_BOTTOM,
+      width: ceilingSpikeWidth,
+      height: HAZARD_CONFIG.ceilingSpikeHeight,
+      active: true,
+      chunkIndex: safeIndex,
+      difficulty
+    },
+    {
+      id: `chunk-${safeIndex}-laser-0`,
+      type: "laser",
+      visual: "laser",
+      x: laserX,
+      y: CEILING_BOTTOM + 42,
+      width: HAZARD_CONFIG.laserWidth,
+      height: GROUND_TOP - CEILING_BOTTOM - 84,
+      active: true,
+      chunkIndex: safeIndex,
+      difficulty,
+      motion: {
+        axis: "x",
+        baseX: laserX,
+        baseY: CEILING_BOTTOM + 42,
+        range: laserRange,
+        speed: laserSpeed,
+        phase: seededUnit(safeIndex, 15) * Math.PI * 2
+      },
+      laser: {
+        cycle,
+        activeRatio,
+        phaseTime: seededUnit(safeIndex, 16) * cycle
+      }
     }
   ];
 
-  let platformNumber = 0;
-  let obstacleNumber = 0;
-
-  for (let elementIndex = 0; elementIndex < pattern.length; elementIndex += 1) {
-    const element = pattern[elementIndex];
-    const heightVariation = Math.round((seededUnit(safeIndex, elementIndex + 1) - 0.5) * 34);
-
-    if (element.type === "platform") {
-      const difficultyLift = Math.round(difficulty * CITY_CONFIG.platformDifficultyLift);
-      surfaces.push({
-        id: `chunk-${safeIndex}-platform-${platformNumber}`,
-        type: "platform",
-        x: chunkX + element.x,
-        y: element.y + heightVariation - difficultyLift,
-        width: element.width,
-        height: element.height,
-        visual: element.visual || "landingPad",
-        chunkIndex: safeIndex
-      });
-      platformNumber += 1;
-      continue;
-    }
-
-    const obstacleHeight = clamp(
-      element.height +
-        Math.round(heightVariation * 0.5) +
-        Math.round(difficulty * CITY_CONFIG.difficultyTowerGrowth),
-      CITY_CONFIG.minTowerHeight,
-      CITY_CONFIG.maxTowerHeight
-    );
-
-    surfaces.push({
-      id: `chunk-${safeIndex}-obstacle-${obstacleNumber}`,
-      type: "obstacle",
-      visual: element.visual || "tower",
-      x: chunkX + element.x,
-      y: GROUND_TOP - obstacleHeight,
-      width: element.width,
-      height: obstacleHeight,
-      chunkIndex: safeIndex
+  if (difficulty >= 4) {
+    const secondX = chunkX + 330 + Math.round(seededUnit(safeIndex, 17) * 90);
+    hazards.push({
+      id: `chunk-${safeIndex}-ceiling-spikes-1`,
+      type: "ceilingSpikes",
+      visual: "spikes",
+      x: secondX,
+      y: CEILING_BOTTOM,
+      width: 78 + Math.round(seededUnit(safeIndex, 18) * 42),
+      height: HAZARD_CONFIG.ceilingSpikeHeight,
+      active: true,
+      chunkIndex: safeIndex,
+      difficulty
     });
-    obstacleNumber += 1;
   }
 
-  return surfaces;
+  if (difficulty >= 6) {
+    const secondLaserX = chunkX + 385;
+    hazards.push({
+      id: `chunk-${safeIndex}-laser-1`,
+      type: "laser",
+      visual: "laser",
+      x: secondLaserX,
+      y: CEILING_BOTTOM + 62,
+      width: HAZARD_CONFIG.laserWidth,
+      height: GROUND_TOP - CEILING_BOTTOM - 124,
+      active: true,
+      chunkIndex: safeIndex,
+      difficulty,
+      motion: {
+        axis: "x",
+        baseX: secondLaserX,
+        baseY: CEILING_BOTTOM + 62,
+        range: Math.max(44, laserRange * 0.65),
+        speed: laserSpeed * 1.12,
+        phase: seededUnit(safeIndex, 19) * Math.PI * 2
+      },
+      laser: {
+        cycle: Math.max(HAZARD_CONFIG.laserMinimumCycle, cycle * 0.92),
+        activeRatio: Math.min(HAZARD_CONFIG.laserMaxActiveRatio, activeRatio + 0.04),
+        phaseTime: seededUnit(safeIndex, 20) * cycle
+      }
+    });
+  }
+
+  return hazards;
 }
 
-export function generateNpcChunk(chunkIndex, chunkSurfaces = null) {
+export function generateDroneChunk(chunkIndex) {
   const safeIndex = Math.max(0, Math.floor(chunkIndex));
   const chunkX = WORLD_CONFIG.proceduralStartX + safeIndex * WORLD_CONFIG.chunkWidth;
-  const surfaces = chunkSurfaces || generateWorldChunk(safeIndex);
-  const npcs = [];
+  const difficulty = difficultyForChunk(safeIndex);
+  const count = Math.min(
+    DRONE_CONFIG.maxPerChunk,
+    DRONE_CONFIG.basePerChunk + Math.floor((difficulty - 1) / 3)
+  );
+  const drones = [];
 
-  for (let npcIndex = 0; npcIndex < NPC_CONFIG.perChunk; npcIndex += 1) {
-    const lane = (npcIndex + 1) / (NPC_CONFIG.perChunk + 1);
-    const jitter = (seededUnit(safeIndex, 40 + npcIndex) - 0.5) * 110;
-    const preferredX = chunkX + WORLD_CONFIG.chunkWidth * lane + jitter;
-    const x = pickNpcSpawnX(surfaces, chunkX, preferredX);
-    const behaviorSeed = seededUnit(safeIndex, 60 + npcIndex);
-    const speed =
-      NPC_CONFIG.minWalkSpeed +
-      behaviorSeed * (NPC_CONFIG.maxWalkSpeed - NPC_CONFIG.minWalkSpeed);
-    const patrolHalf = 72 + seededUnit(safeIndex, 70 + npcIndex) * 62;
+  for (let index = 0; index < count; index += 1) {
+    const lane = (index + 1) / (count + 1);
+    const x =
+      chunkX +
+      250 +
+      lane * 420 +
+      (seededUnit(safeIndex, 30 + index) - 0.5) * 80;
+    const y =
+      CEILING_BOTTOM +
+      165 +
+      seededUnit(safeIndex, 40 + index) * 320;
+    const speed = Math.min(
+      DRONE_CONFIG.maxSpeed,
+      DRONE_CONFIG.minSpeed + (difficulty - 1) * 16 + seededUnit(safeIndex, 50 + index) * 34
+    );
+    const fireInterval = Math.max(
+      DRONE_CONFIG.minFireInterval,
+      DRONE_CONFIG.baseFireInterval - (difficulty - 1) * 0.09
+    );
+    const projectileSpeed = Math.min(
+      DRONE_CONFIG.projectileMaxSpeed,
+      DRONE_CONFIG.projectileBaseSpeed + (difficulty - 1) * 24
+    );
 
-    npcs.push({
-      id: "chunk-" + safeIndex + "-npc-" + npcIndex,
+    drones.push({
+      id: `chunk-${safeIndex}-drone-${index}`,
       chunkIndex: safeIndex,
       x,
-      y: GROUND_TOP,
-      patrolMin: Math.max(chunkX + 24, x - patrolHalf),
-      patrolMax: Math.min(chunkX + WORLD_CONFIG.chunkWidth - 24, x + patrolHalf),
-      direction: seededUnit(safeIndex, 80 + npcIndex) < 0.5 ? -1 : 1,
+      y,
+      homeX: x,
+      homeY: y,
+      difficulty,
       speed,
-      mode: seededUnit(safeIndex, 90 + npcIndex) < 0.28 ? "idle" : "walking",
-      behaviorTimer: 1.2 + seededUnit(safeIndex, 100 + npcIndex) * 2.2,
-      behaviorSeed,
-      behaviorPhase: 0,
-      vx: 0,
-      vy: 0,
-      rotation: 0,
-      rotationVelocity: 0,
-      hitFlash: 0
+      fireInterval,
+      projectileSpeed,
+      cooldown: 0.5 + seededUnit(safeIndex, 60 + index) * fireInterval,
+      phase: seededUnit(safeIndex, 70 + index) * Math.PI * 2
     });
   }
 
-  return npcs;
+  return drones;
+}
+
+export function generateCheckpoint(chunkIndex) {
+  const safeIndex = Math.max(0, Math.floor(chunkIndex));
+  const chunkX = WORLD_CONFIG.proceduralStartX + safeIndex * WORLD_CONFIG.chunkWidth;
+  const x = chunkX + WORLD_CONFIG.chunkWidth - WORLD_CONFIG.checkpointInset;
+
+  return {
+    id: `checkpoint-${safeIndex + 1}`,
+    index: safeIndex + 1,
+    x,
+    spawnX: x + 34,
+    spawnY: GROUND_TOP - GAME_CONFIG.orbRadius,
+    chunkIndex: safeIndex,
+    difficultyAfter: Math.min(HAZARD_CONFIG.difficultyCap, safeIndex + 2)
+  };
 }
 
 export function findEarliestSurfaceCollision(
@@ -693,15 +762,7 @@ export function findEarliestSurfaceCollision(
   let earliest = null;
 
   for (const surface of state.world.surfaces) {
-    const collisionRect =
-      radius > 0
-        ? {
-            x: surface.x - radius,
-            y: surface.y - radius,
-            width: surface.width + radius * 2,
-            height: surface.height + radius * 2
-          }
-        : surface;
+    const collisionRect = expandedRect(surface, radius);
     const hit = segmentRectIntersection(startX, startY, endX, endY, collisionRect);
     if (!hit) continue;
 
@@ -713,122 +774,209 @@ export function findEarliestSurfaceCollision(
   return earliest;
 }
 
-export function findEarliestNpcCollision(state, startX, startY, endX, endY) {
+export function findEarliestHazardCollision(
+  state,
+  startX,
+  startY,
+  endX,
+  endY,
+  radius = GAME_CONFIG.orbRadius
+) {
   let earliest = null;
 
-  for (const npc of state.world.npcs) {
-    if (npc.mode === "thrown" || npc.mode === "fallen") continue;
-
-    const bounds = {
-      x: npc.x - NPC_CONFIG.width * 0.5,
-      y: npc.y - NPC_CONFIG.height,
-      width: NPC_CONFIG.width,
-      height: NPC_CONFIG.height
-    };
-    const hit = segmentRectIntersection(startX, startY, endX, endY, bounds);
+  for (const hazard of state.world.hazards) {
+    if (!hazard.active) continue;
+    const hit = segmentRectIntersection(
+      startX,
+      startY,
+      endX,
+      endY,
+      expandedRect(hazard, radius)
+    );
     if (!hit) continue;
 
     if (!earliest || hit.t < earliest.t) {
-      earliest = { ...hit, npc };
+      earliest = { ...hit, hazard, cause: hazard.type };
     }
   }
 
   return earliest;
 }
 
-function reconcileActiveNpcs(existingNpcs, definitions, defeatedNpcIds) {
-  const activeDefinitionIds = new Set(definitions.map((definition) => definition.id));
-  for (const defeatedId of defeatedNpcIds) {
-    if (!activeDefinitionIds.has(defeatedId)) {
-      defeatedNpcIds.delete(defeatedId);
-    }
+export function loseLife(state, cause = "hazard") {
+  if (state.orb.invulnerability > 0) return false;
+
+  state.lives -= 1;
+  state.run.deaths += 1;
+  state.run.respawnSerial += 1;
+  state.run.lastDeathCause = cause;
+
+  if (state.lives <= 0) {
+    const restartCount = state.run.restartCount + 1;
+    const respawnSerial = state.run.respawnSerial;
+    const deaths = state.run.deaths;
+    const reset = createGameState();
+
+    reset.run.restartCount = restartCount;
+    reset.run.respawnSerial = respawnSerial;
+    reset.run.deaths = deaths;
+    reset.run.lastDeathCause = cause;
+    reset.animation.runResetPulse = 1;
+    reset.animation.deathPulse = 1;
+
+    replaceState(state, reset);
+    return true;
   }
 
-  const previousById = new Map(existingNpcs.map((npc) => [npc.id, npc]));
-  return definitions
-    .filter((definition) => !defeatedNpcIds.has(definition.id))
-    .map((definition) => previousById.get(definition.id) || { ...definition });
+  state.mode = "ready";
+  state.launch.pointerId = null;
+  state.orb.active = true;
+  state.orb.x = state.checkpoint.spawnX;
+  state.orb.y = state.checkpoint.spawnY;
+  state.orb.vx = 0;
+  state.orb.vy = 0;
+  state.orb.lastBounce = null;
+  state.orb.invulnerability = GAME_CONFIG.respawnInvulnerability;
+  state.world.projectiles = [];
+  state.animation.deathPulse = 1;
+  state.animation.bouncePulse = 0;
+  state.camera.x = state.orb.x;
+  state.camera.y = state.orb.y;
+  refreshWorldForFocus(state, state.orb.x);
+  updateProgress(state);
+  return true;
 }
 
-function updateNpcs(state, dt) {
-  for (const npc of state.world.npcs) {
-    npc.hitFlash = Math.max(0, npc.hitFlash - dt * 3.5);
+function simulateOrbFlight(state, dt) {
+  const startX = state.orb.x;
+  const startY = state.orb.y;
 
-    if (npc.mode === "thrown") {
-      npc.vy += NPC_CONFIG.gravity * dt;
-      npc.x += npc.vx * dt;
-      npc.y += npc.vy * dt;
-      npc.rotation += npc.rotationVelocity * dt;
+  state.orb.vy += GAME_CONFIG.orbGravity * dt;
 
-      if (npc.y >= GROUND_TOP) {
-        npc.y = GROUND_TOP;
-        npc.vx = 0;
-        npc.vy = 0;
-        npc.rotationVelocity = 0;
-        npc.rotation = npc.direction < 0 ? -Math.PI * 0.5 : Math.PI * 0.5;
-        npc.mode = "fallen";
-        npc.behaviorTimer = NPC_CONFIG.fallenDespawnDelay;
-      }
-      continue;
-    }
-
-    if (npc.mode === "fallen") {
-      npc.behaviorTimer -= dt;
-      if (npc.behaviorTimer <= 0) {
-        npc.mode = "removed";
-      }
-      continue;
-    }
-
-    npc.y = GROUND_TOP;
-    npc.behaviorTimer -= dt;
-
-    if (npc.mode === "walking") {
-      const nextX = npc.x + npc.direction * npc.speed * dt;
-      const outsidePatrol = nextX < npc.patrolMin || nextX > npc.patrolMax;
-      const blocked = isNpcWalkBlocked(state.world.surfaces, npc, nextX);
-
-      if (outsidePatrol || blocked) {
-        npc.direction *= -1;
-      } else {
-        npc.x = nextX;
-      }
-    }
-
-    if (npc.behaviorTimer <= 0) {
-      npc.behaviorPhase += 1;
-      if (npc.mode === "walking") {
-        npc.mode = "idle";
-        npc.behaviorTimer = 0.7 + npc.behaviorSeed * 1.15;
-      } else {
-        npc.mode = "walking";
-        npc.direction = npc.behaviorPhase % 2 === 0 ? 1 : -1;
-        npc.behaviorTimer = 1.8 + npc.behaviorSeed * 2.2;
-      }
-    }
+  const speed = Math.hypot(state.orb.vx, state.orb.vy);
+  if (speed > GAME_CONFIG.maxOrbSpeed) {
+    const scale = GAME_CONFIG.maxOrbSpeed / speed;
+    state.orb.vx *= scale;
+    state.orb.vy *= scale;
   }
 
-  state.world.npcs = state.world.npcs.filter((npc) => npc.mode !== "removed");
-}
+  const nextX = startX + state.orb.vx * dt;
+  const nextY = startY + state.orb.vy * dt;
 
-function throwNpcWithOrb(state, npc) {
-  npc.mode = "thrown";
-  npc.vx = state.orb.vx * NPC_CONFIG.hitVelocityScale;
-  npc.vy = Math.min(-90, state.orb.vy * 0.24 - NPC_CONFIG.hitLift);
-  npc.rotationVelocity = clamp(state.orb.vx * 0.012, -9, 9);
-  npc.hitFlash = 1;
-  npc.behaviorTimer = NPC_CONFIG.fallenDespawnDelay;
-  npc.direction = state.orb.vx < 0 ? -1 : 1;
-  state.world.defeatedNpcIds.add(npc.id);
-  state.score.npcHits += 1;
-}
+  refreshWorldForFocus(state, nextX);
+  updateDynamicWorld(state);
 
-function isStandableLanding(hit, incomingVy) {
-  return (
-    incomingVy > 0 &&
-    hit.normalY === -1 &&
-    (hit.surface.type === "ground" || hit.surface.type === "platform")
+  const surfaceHit = findEarliestSurfaceCollision(
+    state,
+    startX,
+    startY,
+    nextX,
+    nextY,
+    GAME_CONFIG.orbRadius
   );
+
+  const lethalHit =
+    state.orb.invulnerability > 0
+      ? null
+      : findEarliestLethalCollision(state, startX, startY, nextX, nextY);
+
+  if (lethalHit && (!surfaceHit || lethalHit.t <= surfaceHit.t)) {
+    state.orb.x = lethalHit.x ?? startX;
+    state.orb.y = lethalHit.y ?? startY;
+    loseLife(state, lethalHit.cause);
+    return;
+  }
+
+  if (surfaceHit) {
+    state.orb.x = surfaceHit.x;
+    state.orb.y = surfaceHit.y;
+    state.orb.travel += Math.hypot(surfaceHit.x - startX, surfaceHit.y - startY);
+    bounceOrbFromSurface(state, surfaceHit);
+  } else {
+    state.orb.x = nextX;
+    state.orb.y = nextY;
+    state.orb.travel += Math.hypot(nextX - startX, nextY - startY);
+  }
+
+  if (
+    state.orb.invulnerability <= 0 &&
+    (state.orb.y > GROUND_TOP + WORLD_CONFIG.worldKillMargin ||
+      state.orb.y < CEILING_BOTTOM - WORLD_CONFIG.worldKillMargin)
+  ) {
+    loseLife(state, "outOfBounds");
+  }
+}
+
+function resolveStationaryLethalContacts(state) {
+  if (state.orb.invulnerability > 0) return;
+
+  const hit = findEarliestLethalCollision(
+    state,
+    state.orb.x,
+    state.orb.y,
+    state.orb.x,
+    state.orb.y
+  );
+
+  if (hit) {
+    loseLife(state, hit.cause);
+  }
+}
+
+function findEarliestLethalCollision(state, startX, startY, endX, endY) {
+  let earliest = findEarliestHazardCollision(
+    state,
+    startX,
+    startY,
+    endX,
+    endY,
+    GAME_CONFIG.orbRadius
+  );
+
+  for (const drone of state.world.drones) {
+    const hit = segmentCircleIntersection(
+      startX,
+      startY,
+      endX,
+      endY,
+      drone.x,
+      drone.y,
+      GAME_CONFIG.orbRadius + DRONE_CONFIG.radius
+    );
+    if (!hit) continue;
+    if (!earliest || hit.t < earliest.t) {
+      earliest = { ...hit, cause: "drone", drone };
+    }
+  }
+
+  for (const projectile of state.world.projectiles) {
+    const relativeStartX = projectile.prevX - startX;
+    const relativeStartY = projectile.prevY - startY;
+    const relativeEndX = projectile.x - endX;
+    const relativeEndY = projectile.y - endY;
+    const hit = segmentCircleIntersection(
+      relativeStartX,
+      relativeStartY,
+      relativeEndX,
+      relativeEndY,
+      0,
+      0,
+      GAME_CONFIG.orbRadius + DRONE_CONFIG.projectileRadius
+    );
+    if (!hit) continue;
+
+    if (!earliest || hit.t < earliest.t) {
+      earliest = {
+        t: hit.t,
+        x: startX + (endX - startX) * hit.t,
+        y: startY + (endY - startY) * hit.t,
+        cause: "projectile",
+        projectile
+      };
+    }
+  }
+
+  return earliest;
 }
 
 function bounceOrbFromSurface(state, hit) {
@@ -840,84 +988,240 @@ function bounceOrbFromSurface(state, hit) {
     state.orb.vy -= impulse * hit.normalY;
   }
 
+  if (hit.normalX !== 0) {
+    state.orb.vy *= GAME_CONFIG.bounceTangentialDamping;
+  } else {
+    state.orb.vx *= GAME_CONFIG.bounceTangentialDamping;
+  }
+
   state.orb.x += hit.normalX * GAME_CONFIG.bounceSeparation;
   state.orb.y += hit.normalY * GAME_CONFIG.bounceSeparation;
-  state.orb.contact = null;
   state.orb.lastBounce = {
     surfaceId: hit.surface.id,
     normalX: hit.normalX,
     normalY: hit.normalY
   };
   state.animation.bouncePulse = 1;
+
+  const speed = Math.hypot(state.orb.vx, state.orb.vy);
+  const canRest = hit.normalY === -1 && state.orb.vy <= 0;
+
+  if (canRest && speed < GAME_CONFIG.restSpeedThreshold) {
+    state.orb.vx = 0;
+    state.orb.vy = 0;
+    state.mode = "ready";
+  }
 }
 
-function reformPlayerAtLanding(state, hit) {
-  state.player.x = state.orb.x;
-  state.player.y = hit.surface.y;
-  state.animation.reformPulse = 1;
-  state.world.maxProgressX = Math.max(state.world.maxProgressX, state.player.x);
-  refreshWorldForFocus(state, state.player.x);
+function updateDynamicWorld(state) {
+  for (const surface of state.world.surfaces) {
+    applyMotion(surface, state.world.clock);
+  }
+
+  for (const hazard of state.world.hazards) {
+    applyMotion(hazard, state.world.clock);
+
+    if (hazard.type === "laser" && hazard.laser) {
+      const phase = mod(
+        state.world.clock + hazard.laser.phaseTime,
+        hazard.laser.cycle
+      );
+      hazard.active = phase < hazard.laser.cycle * hazard.laser.activeRatio;
+    } else {
+      hazard.active = true;
+    }
+  }
 }
 
-function isNpcWalkBlocked(surfaces, npc, nextX) {
-  const halfWidth = NPC_CONFIG.width * 0.5 + 5;
+function updateDrones(state, dt) {
+  const orb = state.orb;
 
-  return surfaces.some(
-    (surface) =>
-      surface.type === "obstacle" &&
-      npc.y >= surface.y &&
-      npc.y <= surface.y + surface.height + 1 &&
-      nextX + halfWidth > surface.x &&
-      nextX - halfWidth < surface.x + surface.width
+  for (const drone of state.world.drones) {
+    const dx = orb.x - drone.x;
+    const dy = orb.y - drone.y;
+    const distance = Math.hypot(dx, dy);
+    drone.cooldown -= dt;
+
+    if (distance <= DRONE_CONFIG.acquireRange && distance > 1) {
+      const desiredX = (dx / distance) * drone.speed;
+      const desiredY = (dy / distance) * drone.speed;
+      const pursuitScale = 0.72;
+
+      drone.x += desiredX * dt * pursuitScale;
+      drone.y += desiredY * dt * pursuitScale;
+    } else {
+      const phase = state.world.clock * 0.8 + drone.phase;
+      drone.x += (drone.homeX + Math.sin(phase) * 24 - drone.x) * Math.min(1, dt * 1.8);
+      drone.y += (drone.homeY + Math.cos(phase * 0.8) * 18 - drone.y) * Math.min(1, dt * 1.8);
+    }
+
+    const chunkMinX =
+      drone.chunkIndex === null
+        ? WORLD_CONFIG.proceduralStartX - 260
+        : WORLD_CONFIG.proceduralStartX +
+          drone.chunkIndex * WORLD_CONFIG.chunkWidth +
+          DRONE_CONFIG.corridorPadding;
+    const chunkMaxX =
+      drone.chunkIndex === null
+        ? WORLD_CONFIG.proceduralStartX + 100
+        : WORLD_CONFIG.proceduralStartX +
+          (drone.chunkIndex + 1) * WORLD_CONFIG.chunkWidth -
+          DRONE_CONFIG.corridorPadding;
+
+    drone.x = clamp(drone.x, chunkMinX, chunkMaxX);
+    drone.y = clamp(
+      drone.y,
+      CEILING_BOTTOM + DRONE_CONFIG.corridorPadding,
+      GROUND_TOP - DRONE_CONFIG.corridorPadding
+    );
+
+    if (
+      drone.cooldown <= 0 &&
+      distance <= DRONE_CONFIG.acquireRange &&
+      state.world.projectiles.length < DRONE_CONFIG.maxProjectiles
+    ) {
+      fireDroneProjectile(state, drone, dx, dy, distance);
+      drone.cooldown = drone.fireInterval;
+    }
+  }
+}
+
+function fireDroneProjectile(state, drone, dx, dy, distance) {
+  const safeDistance = Math.max(1, distance);
+  const vx = (dx / safeDistance) * drone.projectileSpeed;
+  const vy = (dy / safeDistance) * drone.projectileSpeed;
+  const serial = state.world.projectileSerial;
+  state.world.projectileSerial += 1;
+
+  state.world.projectiles.push({
+    id: `${drone.id}-shot-${serial}`,
+    ownerId: drone.id,
+    chunkIndex: drone.chunkIndex,
+    x: drone.x,
+    y: drone.y,
+    prevX: drone.x,
+    prevY: drone.y,
+    vx,
+    vy,
+    age: 0,
+    lifetime: DRONE_CONFIG.projectileLifetime
+  });
+}
+
+function advanceProjectiles(state, dt) {
+  for (const projectile of state.world.projectiles) {
+    projectile.prevX = projectile.x;
+    projectile.prevY = projectile.y;
+    projectile.x += projectile.vx * dt;
+    projectile.y += projectile.vy * dt;
+    projectile.age += dt;
+  }
+}
+
+function pruneProjectiles(state) {
+  state.world.projectiles = state.world.projectiles.filter((projectile) => {
+    if (projectile.age >= projectile.lifetime) return false;
+    if (projectile.y < CEILING_BOTTOM - 120 || projectile.y > GROUND_TOP + 120) return false;
+    if (projectile.x < state.orb.x - 1800 || projectile.x > state.orb.x + 2600) return false;
+    return true;
+  });
+
+  if (state.world.projectiles.length > DRONE_CONFIG.maxProjectiles) {
+    state.world.projectiles.splice(
+      0,
+      state.world.projectiles.length - DRONE_CONFIG.maxProjectiles
+    );
+  }
+}
+
+function updateCheckpointProgress(state) {
+  let nextCheckpoint = null;
+
+  for (const checkpoint of state.world.checkpoints) {
+    if (
+      checkpoint.index > state.checkpoint.index &&
+      state.orb.x >= checkpoint.x &&
+      (!nextCheckpoint || checkpoint.index < nextCheckpoint.index)
+    ) {
+      nextCheckpoint = checkpoint;
+    }
+  }
+
+  if (!nextCheckpoint) return;
+
+  state.checkpoint.index = nextCheckpoint.index;
+  state.checkpoint.x = nextCheckpoint.x;
+  state.checkpoint.spawnX = nextCheckpoint.spawnX;
+  state.checkpoint.spawnY = nextCheckpoint.spawnY;
+  state.progress.difficultyLevel = nextCheckpoint.difficultyAfter;
+  state.animation.checkpointPulse = 1;
+}
+
+function updateProgress(state) {
+  state.progress.maxProgressX = Math.max(state.progress.maxProgressX, state.orb.x);
+  state.progress.currentMetres = Math.max(
+    0,
+    Math.floor((state.orb.x - state.progress.startX) / 10)
+  );
+  state.progress.furthestMetres = Math.max(
+    state.progress.furthestMetres,
+    Math.floor((state.progress.maxProgressX - state.progress.startX) / 10)
   );
 }
 
-function pickNpcSpawnX(surfaces, chunkX, preferredX) {
-  const safeLeft = chunkX + 48;
-  const safeRight = chunkX + WORLD_CONFIG.chunkWidth - 48;
-  const clearance = NPC_CONFIG.width + 18;
-  const obstacles = surfaces
-    .filter((surface) => surface.type === "obstacle")
-    .sort((a, b) => a.x - b.x);
+function updateCamera(state, dt) {
+  const cameraBlend = 1 - Math.exp(-GAME_CONFIG.cameraSharpness * dt);
+  state.camera.x += (state.orb.x - state.camera.x) * cameraBlend;
+  state.camera.y += (state.orb.y - state.camera.y) * cameraBlend;
+}
 
-  const ranges = [];
-  let cursor = safeLeft;
+function reconcileActiveDrones(existingDrones, definitions) {
+  const previousById = new Map(existingDrones.map((drone) => [drone.id, drone]));
 
-  for (const obstacle of obstacles) {
-    const blockedStart = Math.max(safeLeft, obstacle.x - clearance);
-    const blockedEnd = Math.min(safeRight, obstacle.x + obstacle.width + clearance);
+  return definitions.map((definition) => {
+    const existing = previousById.get(definition.id);
+    if (!existing) return { ...definition };
 
-    if (blockedStart > cursor) {
-      ranges.push([cursor, blockedStart]);
+    return {
+      ...definition,
+      x: existing.x,
+      y: existing.y,
+      cooldown: existing.cooldown
+    };
+  });
+}
+
+function makeMovingPlatform(id, chunkIndex, x, y, axis, range, speed, phase) {
+  return {
+    id,
+    type: "platform",
+    visual: "movingPlatform",
+    x,
+    y,
+    width: HAZARD_CONFIG.movingPlatformWidth,
+    height: HAZARD_CONFIG.movingPlatformHeight,
+    chunkIndex,
+    motion: {
+      axis,
+      baseX: x,
+      baseY: y,
+      range,
+      speed,
+      phase
     }
-    cursor = Math.max(cursor, blockedEnd);
-  }
+  };
+}
 
-  if (cursor < safeRight) {
-    ranges.push([cursor, safeRight]);
-  }
+function applyMotion(item, clock) {
+  if (!item.motion) return;
 
-  if (ranges.length === 0) {
-    return clamp(preferredX, safeLeft, safeRight);
-  }
+  const offset = Math.sin(clock * item.motion.speed + item.motion.phase) * item.motion.range;
+  item.x = item.motion.baseX + (item.motion.axis === "x" ? offset : 0);
+  item.y = item.motion.baseY + (item.motion.axis === "y" ? offset : 0);
+}
 
-  let bestRange = ranges[0];
-  let bestDistance = Infinity;
-
-  for (const range of ranges) {
-    if (preferredX >= range[0] && preferredX <= range[1]) {
-      return preferredX;
-    }
-
-    const nearest = clamp(preferredX, range[0], range[1]);
-    const distance = Math.abs(nearest - preferredX);
-    if (distance < bestDistance) {
-      bestDistance = distance;
-      bestRange = range;
-    }
-  }
-
-  return clamp(preferredX, bestRange[0], bestRange[1]);
+function difficultyForChunk(chunkIndex) {
+  return Math.min(HAZARD_CONFIG.difficultyCap, Math.max(1, chunkIndex + 1));
 }
 
 function getChunkIndexForX(x) {
@@ -929,6 +1233,25 @@ function getChunkIndexForX(x) {
     0,
     Math.floor((x - WORLD_CONFIG.proceduralStartX) / WORLD_CONFIG.chunkWidth)
   );
+}
+
+function cloneWorldItem(item) {
+  return {
+    ...item,
+    motion: item.motion ? { ...item.motion } : undefined,
+    laser: item.laser ? { ...item.laser } : undefined
+  };
+}
+
+function expandedRect(rect, radius) {
+  if (radius <= 0) return rect;
+
+  return {
+    x: rect.x - radius,
+    y: rect.y - radius,
+    width: rect.width + radius * 2,
+    height: rect.height + radius * 2
+  };
 }
 
 function seededUnit(chunkIndex, salt) {
@@ -946,8 +1269,6 @@ function seededUnit(chunkIndex, salt) {
 
   return (value >>> 0) / 4294967296;
 }
-
-
 
 function segmentRectIntersection(startX, startY, endX, endY, rect) {
   const dx = endX - startX;
@@ -977,7 +1298,7 @@ function segmentRectIntersection(startX, startY, endX, endY, rect) {
   tExit = Math.min(tExit, yResult.exit);
   if (tEnter > tExit || tEnter < 0 || tEnter > 1) return null;
 
-  if (normalX === 0 && normalY === 0) {
+  if (normalX === 0 && normalY === 0 && (dx !== 0 || dy !== 0)) {
     if (Math.abs(dx) >= Math.abs(dy)) {
       normalX = dx >= 0 ? -1 : 1;
     } else {
@@ -991,6 +1312,39 @@ function segmentRectIntersection(startX, startY, endX, endY, rect) {
     y: startY + dy * tEnter,
     normalX,
     normalY
+  };
+}
+
+function segmentCircleIntersection(startX, startY, endX, endY, cx, cy, radius) {
+  const dx = endX - startX;
+  const dy = endY - startY;
+  const fx = startX - cx;
+  const fy = startY - cy;
+
+  const a = dx * dx + dy * dy;
+  const c = fx * fx + fy * fy - radius * radius;
+
+  if (a < 1e-12) {
+    if (c <= 0) {
+      return { t: 0, x: startX, y: startY };
+    }
+    return null;
+  }
+
+  const b = 2 * (fx * dx + fy * dy);
+  const discriminant = b * b - 4 * a * c;
+  if (discriminant < 0) return null;
+
+  const sqrtDiscriminant = Math.sqrt(discriminant);
+  const t1 = (-b - sqrtDiscriminant) / (2 * a);
+  const t2 = (-b + sqrtDiscriminant) / (2 * a);
+  const t = t1 >= 0 && t1 <= 1 ? t1 : t2 >= 0 && t2 <= 1 ? t2 : null;
+  if (t === null) return null;
+
+  return {
+    t,
+    x: startX + dx * t,
+    y: startY + dy * t
   };
 }
 
@@ -1009,6 +1363,17 @@ function clipAxis(start, delta, min, max, minNormalX, minNormalY, maxNormalX, ma
   }
 
   return { enter: tMax, exit: tMin, normalX: maxNormalX, normalY: maxNormalY };
+}
+
+function replaceState(target, source) {
+  for (const key of Object.keys(target)) {
+    delete target[key];
+  }
+  Object.assign(target, source);
+}
+
+function mod(value, divisor) {
+  return ((value % divisor) + divisor) % divisor;
 }
 
 function clamp(value, min, max) {

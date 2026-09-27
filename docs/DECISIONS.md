@@ -159,3 +159,19 @@ Standable platforms may present as rooftop decks, landing pads or hover cars. No
 The minimum generated tower height is intentionally greater than the ballistic rise of a full-power 45-degree launch. This removes the obvious one-shot diagonal flyover while still allowing steeper launches and, more importantly, the repeatable midair freeze/redirection system from 0.9 to solve vertical routes.
 
 Reason: platforms and obstacles should have a clear purpose and visual identity without splitting rendering from collision truth, and the skyline should create traversal decisions that make the orb's redirection power matter.
+
+## 2026-09-27 — Prototype 0.11 becomes a permanent-orb hazard survival run
+
+- The playable character remains in energy-orb form permanently. Landing no longer reforms a human character.
+- Solid traversal geometry is restricted to floor, ceiling and moving-platform surfaces. Legacy city obstacle surfaces and NPC target systems are removed from the active gameplay loop.
+- The procedural course is an enclosed corridor with deterministic floor gaps/spike pits, roof spikes, vertically moving platforms and moving lasers that cycle between active and inactive states.
+- Gameplay uses seven lives. Lethal hazards, drones and projectiles consume one life and respawn the orb at the latest checkpoint with brief invulnerability. Losing the seventh life automatically resets the run.
+- Each procedural chunk ends with a checkpoint. Checkpoint progression is the source of truth for respawn position and difficulty advancement.
+- Difficulty is data-driven from checkpoint/chunk progression: moving-platform speed/range, laser timing and density, ceiling-spike density, drone count/speed, projectile speed and fire interval scale upward within explicit caps.
+- Drones and their projectiles remain slower than the orb's maximum configured speed so evasion remains player-controlled rather than unavoidable.
+- Mid-air re-aim keeps the established time-freeze rule: the gameplay clock, dynamic surfaces, lasers, drones and projectiles do not advance while the player is redirecting.
+- Current/furthest run distance belongs to the simulation state. Persistent best-distance storage stays in the browser/UI layer so persistence does not contaminate deterministic gameplay logic.
+- World surfaces, hazards, checkpoints, drones and projectiles remain bounded through streamed chunk windows to preserve mobile performance and long-run scalability.
+
+Reason: the game is now centered on momentum survival and precision redirection instead of defeating NPCs or landing to transform back. The new boundaries keep hazards, progression, persistence and rendering separable for future expansion.
+
