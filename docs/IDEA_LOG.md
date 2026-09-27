@@ -11,15 +11,16 @@ Use this file to preserve experiments without turning every thought into permane
 - **Park** — not useful now, but worth preserving.
 - **Reject** — tested and intentionally abandoned.
 
-## Ideas
+## Prototype — Spear Relay traversal
 
-No gameplay ideas have been committed yet.
+**Status:** Prototype
 
-When a new idea is tested, record:
+**Idea:** A 2D character traverses the world by throwing a spear. The player presses and drags to aim and control power, releases to throw, then watches the camera follow the flying spear. Pressing again relocates the character to the spear's current position and immediately starts the next aim.
 
-- the idea;
-- what question the prototype is meant to answer;
-- the smallest playable implementation;
-- the result after testing;
-- whether to Keep, Rework, Park, or Reject it;
-- any architectural decision created by the experiment.
+**Question being tested:** Is repeated throw -> camera chase -> mid-flight relocation -> re-aim satisfying enough to become a core movement mechanic?
+
+**Smallest playable implementation:** One character, one spear, ballistic flight, camera follow, repeated touch relay, simple prototype world reference grid and no collision.
+
+**Result:** Awaiting device playtest.
+
+**Next decision after testing:** Keep, Rework, Park or Reject based on aiming feel, camera readability and whether chaining throws is enjoyable.

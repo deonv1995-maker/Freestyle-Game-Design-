@@ -18,12 +18,28 @@ Reason: this keeps implementation tied to the real repository state rather than 
 
 Decision: once a playable prototype exists, `main` becomes the stable playable baseline. Future experiments should preserve that baseline or be isolated until they are safe to merge.
 
-## 2026-09-27 — No engine chosen yet
-
-Decision: do not preselect Unity, Three.js, Godot, another engine, or a particular rendering architecture before the first concrete game idea establishes the requirements.
-
-Reason: this repository exists for experimentation, so the technical foundation should serve the idea rather than constrain it prematurely.
-
 ## 2026-09-27 — Documentation is project memory
 
 Decision: important gameplay and architecture decisions are recorded in this repository. Current repository documentation takes precedence over reconstructing project intent from old chat history.
+
+## 2026-09-27 — First prototype uses browser-native 2D Canvas
+
+Decision: the first Spear Relay prototype uses HTML5 Canvas and JavaScript with no runtime framework or game-engine dependency. Gameplay state/physics are separated from input/rendering.
+
+Reason: the requested mechanic is 2D, touch-first and small enough to test directly in a browser. A minimal stack provides the shortest path to repeatable phone testing while preserving the option to move to a larger engine if later experiments genuinely require it.
+
+This replaces the earlier temporary "no engine chosen yet" state for the current prototype only; it is not a permanent prohibition on changing technology later.
+
+## 2026-09-27 — Spear relay input contract
+
+Decision: aiming is a screen-space drag gesture. Drag direction determines throw direction and drag distance determines throw power. Releasing throws the spear with light ballistic gravity.
+
+While the spear is in flight, the camera follows the spear. Pressing again immediately relocates the character to the spear's exact current world position, stops the current spear flight, and uses that same press as the start of the next aim gesture.
+
+Reason: one continuous press-drag-release loop matches the requested touch interaction without adding movement buttons, confirmation controls or a separate teleport command.
+
+## 2026-09-27 — Prototype 0.1 excludes world collision
+
+Decision: Spear Relay 0.1 intentionally has no terrain collision, enemies, damage, death state or progression.
+
+Reason: the first test should answer whether throw-follow-relocate-repeat is satisfying before other systems obscure that core movement question.
