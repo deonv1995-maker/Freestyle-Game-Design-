@@ -213,3 +213,9 @@ Decision: the vertical corridor's starting end is physically closed by a `bottom
 Decision: direct orb contact with a drone still performs the existing gameplay destruction, but the same destruction event now queues a transient explosion record in a dedicated effects collection. Explosion records contain only source position, phase and lifetime data, advance on the authoritative gameplay delta so touch slow motion affects them consistently, and are both duration-pruned and count-capped before rendering.
 
 Reason: the course should read as a deliberately enclosed launch chamber at the bottom, while drone kills need immediate visual confirmation without introducing persistent particle entities, duplicate destruction logic or unbounded mobile runtime state.
+
+## 2026-09-27 — Laser cadence reduced by half
+
+Decision: persistent laser timing remains centralized in `HAZARD_CONFIG`, but the base cycle is doubled from 3.6 seconds to 7.2 seconds and the minimum high-difficulty cycle is doubled from 1.8 seconds to 3.6 seconds. Beam geometry, active-ratio scaling, collision behavior and touch slow motion are unchanged.
+
+Reason: doubling the cycle duration makes the laser on/off cadence exactly half as fast while preserving the existing single-source-of-truth difficulty model and hazard behavior.
