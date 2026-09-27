@@ -235,3 +235,11 @@ Decision: wall and roof spike hazards are removed from the authored starter area
 Decision: laser shutdown warning is derived from the same authoritative phase used for beam activation. The final 0.7 seconds of each active window sets a `shutdownFlicker` state and alternates beam brightness at a centralized rate of 9 Hz. The beam remains lethal and visibly present throughout the warning window; only its brightness flickers, so collision never contradicts presentation.
 
 Reason: the course should emphasize readable timing and momentum decisions rather than static spike traps. A phase-driven flicker gives the player a clear cue that an active beam is about to switch off without introducing a second timer or desynchronized visual-only state.
+
+## 2026-09-27 — Drones telegraph projectile fire
+
+Decision: drones use a centralized `DRONE_CONFIG.preFireWarningDuration` of 0.6 seconds. A drone may enter the warning state only when the orb is inside acquisition range and projectile capacity is available. The warning exposes normalized progress for rendering and is derived from the same cooldown that triggers the shot.
+
+Decision: if a drone becomes ready while the orb is out of range, or while the global projectile cap blocks firing, its cooldown is held at the warning boundary rather than allowed to expire. Once firing becomes possible, the full warning window must elapse before a projectile can launch. After firing, warning state resets with the normal fire interval.
+
+Reason: the visual indicator must be mechanically trustworthy. The player should never be snap-shot by a drone that had no visible pre-fire cue, and the renderer should not maintain a separate timer that can drift from authoritative projectile logic.
