@@ -4,7 +4,7 @@ An experimental game-design repository for rapidly turning ideas into playable p
 
 This project is intentionally open-ended. It may become one game, several experiments, or a place to test unusual mechanics before deciding what deserves deeper development.
 
-## Current playable slice — Spear Relay 0.5
+## Current playable slice — Spear Relay 0.6
 
 The current prototype is a mobile-first 2D traversal mechanic:
 
@@ -17,11 +17,11 @@ The current prototype is a mobile-first 2D traversal mechanic:
 - press again while the spear is flying or planted to relocate the character to the spear's current position;
 - that same press immediately starts the next aiming gesture;
 - the player now visibly winds up, leans and follows through when aiming and throwing;
-- relaying to a spear that is still in flight enters a tucked airborne pose with slowed visual motion and a precision reticle;\n- lightweight NPCs now stand and patrol through the streamed world;\n- hitting an NPC with the spear throws the NPC physically and increments a per-run hit counter.
+- relaying to a spear that is still in flight enters a tucked airborne pose with slowed visual motion and a precision reticle;\n- lightweight NPCs now stand and patrol through the streamed world;\n- hitting an NPC with the spear knocks the NPC down with impact, then removes it from the active world and increments a per-run hit counter;\n- when the spear hits solid world geometry, the player now relocates to that exact impact point automatically, so the next press is only for aiming the next throw.
 
 The handmade opening section now flows into an endless deterministic traversal course. As play moves forward, nearby world chunks are generated from a fixed seed, each with continuous ground plus varied platforms and obstacles. Old distant procedural chunks are discarded and can be regenerated identically later, keeping runtime memory bounded on mobile.
 
-The prototype is still focused on movement. NPCs are currently non-hostile traversal targets; there is still no player damage, death state or larger progression system.
+The prototype is still focused on movement. NPCs are currently non-hostile traversal targets that disappear after their hit reaction; there is still no player damage, death state or larger progression system.
 
 ## Technical foundation
 
