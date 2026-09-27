@@ -43,3 +43,9 @@ Reason: one continuous press-drag-release loop matches the requested touch inter
 Decision: Spear Relay 0.1 intentionally has no terrain collision, enemies, damage, death state or progression.
 
 Reason: the first test should answer whether throw-follow-relocate-repeat is satisfying before other systems obscure that core movement question.
+
+## 2026-09-27 — Home-screen testing uses a lightweight web-app manifest
+
+Decision: Spear Relay exposes install metadata and a dedicated app icon so the deployed GitHub Pages prototype can be added to a phone home screen and opened in standalone mode.
+
+Reason: one-tap access shortens the test loop without introducing a native packaging pipeline before the core mechanic earns that complexity. No service worker is added yet, because an offline cache can make rapid iteration confusing by serving an older prototype after a deployment.
