@@ -4,18 +4,18 @@ An experimental game-design repository for rapidly turning ideas into playable p
 
 This project is intentionally open-ended. It may become one game, several experiments, or a place to test unusual mechanics before deciding what deserves deeper development.
 
-## Current playable slice — Energy Relay 0.11
+## Current playable slice — Energy Relay 0.12
 
 - The player remains permanently in the blue energy-orb state; there is no human reform state.
-- Drag in the direction of travel to launch from rest. While airborne, press/hold to freeze gameplay and drag a new direction to redirect the same orb.
-- Solid floor, roof and moving-platform contacts bounce the orb. Restitution and tangential damping bleed momentum until a low-speed floor contact settles the orb for another launch.
-- The previous city towers/obstacles and NPC targets are removed from the active loop.
-- The course is now an enclosed survival corridor with a continuous roof, top/bottom moving platforms, moving timed lasers, floor spike pits and roof spikes.
+- Movement is now true zero-gravity/inertial motion: the orb has no constant downward acceleration. It keeps its current velocity until a redirect, collision or damping event changes it.
+- The run progresses from the bottom of the screen upward through a narrow space corridor with continuous left and right walls.
+- Drag in the direction of travel to launch from rest. While moving, press/hold to freeze gameplay and drag a new direction to redirect the same orb.
+- Side-wall and moving-platform contacts bounce the orb. Restitution and tangential damping bleed momentum, and a sufficiently low-speed impact settles the orb for another launch.
+- Hazards are oriented for vertical play: spikes project inward from the side walls and timed lasers span horizontally across the corridor while moving vertically.
 - The orb has seven lives. A lethal hit respawns at the latest checkpoint with short invulnerability; losing the seventh life automatically starts a fresh run.
-- Checkpoints advance the respawn point and difficulty level. Later sections increase platform motion, laser pressure, spike density and drone pressure.
-- Targeting drones pursue within range and fire projectiles. Direct orb contact destroys the drone without costing a life; fired projectiles remain lethal. Drone and projectile speed remain below the orb's configured maximum speed.
-- The HUD tracks lives, current distance, best record, checkpoint and difficulty level. The best distance record persists locally in the browser.
-- Procedural chunks, hazards, checkpoints and drones are deterministic and streamed within bounded windows for mobile-friendly runtime behavior.
+- Checkpoints, difficulty, procedural streaming and distance records all use upward vertical progress as their single source of truth.
+- Targeting drones pursue within their active vertical chunk and fire projectiles. Direct orb contact destroys the drone without costing a life; fired projectiles remain lethal.
+- Procedural chunks, hazards, checkpoints and drones remain deterministic and bounded for mobile-friendly runtime behavior.
 
 ## Technical foundation
 
