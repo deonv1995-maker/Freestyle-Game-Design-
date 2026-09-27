@@ -18,7 +18,7 @@ export const GAME_CONFIG = Object.freeze({
   restSpeedThreshold: 105,
   cameraSharpness: 10,
   cameraZoom: 0.78,
-  airAimTimeScale: 0.2,
+  touchTimeScale: 0.2,
   respawnInvulnerability: 0.9,
   startingLives: 7
 });
@@ -45,8 +45,8 @@ export const HAZARD_CONFIG = Object.freeze({
   spikeMaxSpan: 188,
   laserHeight: 12,
   laserWallInset: 0,
-  laserBaseCycle: 2.8,
-  laserMinimumCycle: 1.35,
+  laserBaseCycle: 3.6,
+  laserMinimumCycle: 1.8,
   laserBaseActiveRatio: 0.5,
   laserMaxActiveRatio: 0.68,
   movingPlatformWidth: 170,
@@ -152,7 +152,7 @@ export const STARTER_HAZARDS = Object.freeze([
     height: HAZARD_CONFIG.laserHeight,
     active: true,
     laser: Object.freeze({
-      cycle: 2.8,
+      cycle: HAZARD_CONFIG.laserBaseCycle,
       activeRatio: 0.5,
       phaseTime: 0.35,
       sourceSide: "left"
@@ -369,13 +369,12 @@ export function cancelAim(state, pointerId = state.launch.pointerId) {
 
 export function stepGame(state, deltaSeconds) {
   const dt = clamp(deltaSeconds, 0, 0.05);
-  const gameplayScale =
-    state.mode === "airAiming" ? GAME_CONFIG.airAimTimeScale : 1;
+  const touchSlowMotionActive = state.launch.pointerId !== null;
+  const gameplayScale = touchSlowMotionActive ? GAME_CONFIG.touchTimeScale : 1;
   const gameplayDt = dt * gameplayScale;
 
-  // Authoritative gameplay and gameplay-driven animation share the same time
-  // scale so re-aiming reads as true slow motion instead of a hidden physics
-  // slowdown under full-speed visuals.
+  // Any active gameplay touch/aim slows authoritative gameplay and
+  // gameplay-driven animation together, including the very first launch aim.
   state.animation.clock += gameplayDt;
   state.animation.transformPulse = Math.max(
     0,
