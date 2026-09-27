@@ -30,6 +30,12 @@ The static build is produced by `scripts/build.mjs`, and the repository includes
 
 This choice is intentionally lightweight. It is not a permanent commitment to a larger engine if future experiments require one.
 
+## Phone testing
+
+The deployed GitHub Pages build includes a web-app manifest and dedicated Spear Relay icon. On Android, open the deployed prototype in Chrome, use the browser menu, and choose **Add to Home screen** or **Install app** when offered. The shortcut opens in standalone mode so repeated phone testing is one tap from the home screen.
+
+A service worker is intentionally not used yet. Keeping the prototype free of an offline cache reduces the chance of an older build being mistaken for the newest test after a deployment.
+
 ## Local commands
 
 - `npm test` — run core mechanic tests.

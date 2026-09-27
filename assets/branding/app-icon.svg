@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Spear Relay app icon">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1177d1"/>
+      <stop offset="0.58" stop-color="#48a8e8"/>
+      <stop offset="1" stop-color="#ffb84d"/>
+    </linearGradient>
+    <linearGradient id="sun" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fff7b2"/>
+      <stop offset="1" stop-color="#ffc24d"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="104" fill="url(#sky)"/>
+  <circle cx="412" cy="330" r="72" fill="url(#sun)" opacity=".96"/>
+  <path d="M0 352 95 284l47 33 58-63 53 59 57-36 94 75 108-50v210H0Z" fill="#415b78" opacity=".88"/>
+  <path d="M0 409 88 370l66 25 70-31 79 35 78-29 131 44v98H0Z" fill="#17344f"/>
+  <path d="M0 454 121 420l104 31 93-18 86 20 108-29v88H0Z" fill="#0c2438"/>
+  <path d="M0 446 102 400l87 52 77-8 60 68H0Z" fill="#11171f"/>
+
+  <g fill="#15100d">
+    <circle cx="154" cy="262" r="26"/>
+    <path d="M129 288c19-15 48-13 65 3l34 34-26 29-27-22-11 67-48 1 8-69-44 42-29-29 55-50c7-6 14-10 23-6Z"/>
+    <path d="m153 397 40-4 58 56-27 29-62-52-55 67-34-22 57-75Z"/>
+    <path d="m190 297 85-53 12 18-78 66Z"/>
+  </g>
+
+  <g stroke="#fff" stroke-linecap="round" opacity=".74">
+    <path d="M236 244 385 160" stroke-width="9"/>
+    <path d="M250 267 399 183" stroke-width="5"/>
+  </g>
+
+  <g transform="rotate(-29 366 185)">
+    <rect x="258" y="178" width="183" height="14" rx="7" fill="#7a3c17"/>
+    <path d="m438 166 48 19-48 19 8-19Z" fill="#29384d"/>
+    <path d="m440 171 35 14-35 14 7-14Z" fill="#8290a5"/>
+    <path d="M274 175v20M286 175v20" stroke="#2b160b" stroke-width="6"/>
+  </g>
+</svg>

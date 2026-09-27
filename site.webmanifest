@@ -1,0 +1,25 @@
+{
+  "id": "./",
+  "name": "Spear Relay — Freestyle Game Design",
+  "short_name": "Spear Relay",
+  "description": "Mobile-first Spear Relay gameplay prototype.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#101827",
+  "theme_color": "#101827",
+  "icons": [
+    {
+      "src": "./assets/branding/app-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "./assets/branding/app-icon-test-128.png",
+      "sizes": "128x128",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}
