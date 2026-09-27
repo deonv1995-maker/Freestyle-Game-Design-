@@ -18,6 +18,7 @@ export const GAME_CONFIG = Object.freeze({
   restSpeedThreshold: 105,
   cameraSharpness: 10,
   cameraZoom: 0.78,
+  airAimTimeScale: 0.2,
   respawnInvulnerability: 0.9,
   startingLives: 7
 });
@@ -43,7 +44,7 @@ export const HAZARD_CONFIG = Object.freeze({
   spikeMinSpan: 118,
   spikeMaxSpan: 188,
   laserHeight: 12,
-  laserMoveRange: 86,
+  laserWallInset: 0,
   laserBaseCycle: 2.8,
   laserMinimumCycle: 1.35,
   laserBaseActiveRatio: 0.5,
@@ -142,23 +143,19 @@ export const STARTER_HAZARDS = Object.freeze([
     id: "starter-laser",
     type: "laser",
     visual: "laser",
-    x: CORRIDOR_LEFT + 42,
+    x: CORRIDOR_LEFT + HAZARD_CONFIG.laserWallInset,
     y: 315,
-    width: CORRIDOR_RIGHT - CORRIDOR_LEFT - 84,
+    width:
+      CORRIDOR_RIGHT -
+      CORRIDOR_LEFT -
+      HAZARD_CONFIG.laserWallInset * 2,
     height: HAZARD_CONFIG.laserHeight,
     active: true,
-    motion: Object.freeze({
-      axis: "y",
-      baseX: CORRIDOR_LEFT + 42,
-      baseY: 315,
-      range: 58,
-      speed: 0.72,
-      phase: 1.1
-    }),
     laser: Object.freeze({
       cycle: 2.8,
       activeRatio: 0.5,
-      phaseTime: 0.35
+      phaseTime: 0.35,
+      sourceSide: "left"
     })
   })
 ]);
@@ -250,7 +247,7 @@ export function createGameState() {
     }
   };
 
-  refreshWorldForFocus(state, START_POSITION.x);
+  refreshWorldForFocus(state, START_POSITION.y);
   updateProgress(state);
   return state;
 }
@@ -368,41 +365,62 @@ export function cancelAim(state, pointerId = state.launch.pointerId) {
   return true;
 }
 
+
+
 export function stepGame(state, deltaSeconds) {
   const dt = clamp(deltaSeconds, 0, 0.05);
+  const gameplayScale =
+    state.mode === "airAiming" ? GAME_CONFIG.airAimTimeScale : 1;
+  const gameplayDt = dt * gameplayScale;
 
-  state.animation.clock += dt;
-  state.animation.transformPulse = Math.max(0, state.animation.transformPulse - dt * 3.5);
-  state.animation.bouncePulse = Math.max(0, state.animation.bouncePulse - dt * 5);
-  state.animation.deathPulse = Math.max(0, state.animation.deathPulse - dt * 2.2);
-  state.animation.checkpointPulse = Math.max(0, state.animation.checkpointPulse - dt * 1.8);
-  state.animation.runResetPulse = Math.max(0, state.animation.runResetPulse - dt * 1.5);
+  // Authoritative gameplay and gameplay-driven animation share the same time
+  // scale so re-aiming reads as true slow motion instead of a hidden physics
+  // slowdown under full-speed visuals.
+  state.animation.clock += gameplayDt;
+  state.animation.transformPulse = Math.max(
+    0,
+    state.animation.transformPulse - gameplayDt * 3.5
+  );
+  state.animation.bouncePulse = Math.max(
+    0,
+    state.animation.bouncePulse - gameplayDt * 5
+  );
+  state.animation.deathPulse = Math.max(
+    0,
+    state.animation.deathPulse - gameplayDt * 2.2
+  );
+  state.animation.checkpointPulse = Math.max(
+    0,
+    state.animation.checkpointPulse - gameplayDt * 1.8
+  );
+  state.animation.runResetPulse = Math.max(
+    0,
+    state.animation.runResetPulse - gameplayDt * 1.5
+  );
 
-  const gameplayFrozen = state.mode === "airAiming";
+  state.world.clock += gameplayDt;
+  state.orb.invulnerability = Math.max(
+    0,
+    state.orb.invulnerability - gameplayDt
+  );
 
-  if (!gameplayFrozen) {
-    state.world.clock += dt;
-    state.orb.invulnerability = Math.max(0, state.orb.invulnerability - dt);
+  refreshWorldForFocus(state, state.orb.y);
+  updateDynamicWorld(state);
+  updateDrones(state, gameplayDt);
+  advanceProjectiles(state, gameplayDt);
 
-    refreshWorldForFocus(state, state.orb.y);
-    updateDynamicWorld(state);
-    updateDrones(state, dt);
-    advanceProjectiles(state, dt);
-
-    if (state.mode === "orb") {
-      simulateOrbFlight(state, dt);
-    } else {
-      resolveStationaryLethalContacts(state);
-    }
-
-    updateProgress(state);
-    updateCheckpointProgress(state);
-    pruneProjectiles(state);
+  if (state.mode === "orb" || state.mode === "airAiming") {
+    simulateOrbFlight(state, gameplayDt);
   } else {
-    refreshWorldForFocus(state, state.orb.y);
-    updateDynamicWorld(state);
+    resolveStationaryLethalContacts(state);
   }
 
+  updateProgress(state);
+  updateCheckpointProgress(state);
+  pruneProjectiles(state);
+
+  // Camera interpolation remains presentation-time based so aiming stays
+  // readable and responsive while the world itself runs at the scaled rate.
   updateCamera(state, dt);
 }
 
@@ -574,9 +592,6 @@ export function generateHazardChunk(chunkIndex) {
   );
   const laserY =
     chunkBottomY - 330 - Math.round(seededUnit(safeIndex, 14) * 90);
-  const laserRange =
-    HAZARD_CONFIG.laserMoveRange + Math.min(50, (difficulty - 1) * 4);
-  const laserSpeed = 0.72 + Math.min(0.68, (difficulty - 1) * 0.055);
   const corridorWidth = CORRIDOR_RIGHT - CORRIDOR_LEFT;
 
   const hazards = [
@@ -608,25 +623,18 @@ export function generateHazardChunk(chunkIndex) {
       id: `chunk-${safeIndex}-laser-0`,
       type: "laser",
       visual: "laser",
-      x: CORRIDOR_LEFT + 42,
+      x: CORRIDOR_LEFT + HAZARD_CONFIG.laserWallInset,
       y: laserY,
-      width: corridorWidth - 84,
+      width: corridorWidth - HAZARD_CONFIG.laserWallInset * 2,
       height: HAZARD_CONFIG.laserHeight,
       active: true,
       chunkIndex: safeIndex,
       difficulty,
-      motion: {
-        axis: "y",
-        baseX: CORRIDOR_LEFT + 42,
-        baseY: laserY,
-        range: laserRange,
-        speed: laserSpeed,
-        phase: seededUnit(safeIndex, 15) * Math.PI * 2
-      },
       laser: {
         cycle,
         activeRatio,
-        phaseTime: seededUnit(safeIndex, 16) * cycle
+        phaseTime: seededUnit(safeIndex, 16) * cycle,
+        sourceSide: safeIndex % 2 === 0 ? "left" : "right"
       }
     }
   ];
@@ -654,25 +662,18 @@ export function generateHazardChunk(chunkIndex) {
       id: `chunk-${safeIndex}-laser-1`,
       type: "laser",
       visual: "laser",
-      x: CORRIDOR_LEFT + 62,
+      x: CORRIDOR_LEFT + HAZARD_CONFIG.laserWallInset,
       y: secondLaserY,
-      width: corridorWidth - 124,
+      width: corridorWidth - HAZARD_CONFIG.laserWallInset * 2,
       height: HAZARD_CONFIG.laserHeight,
       active: true,
       chunkIndex: safeIndex,
       difficulty,
-      motion: {
-        axis: "y",
-        baseX: CORRIDOR_LEFT + 62,
-        baseY: secondLaserY,
-        range: Math.max(44, laserRange * 0.65),
-        speed: laserSpeed * 1.12,
-        phase: seededUnit(safeIndex, 19) * Math.PI * 2
-      },
       laser: {
         cycle: Math.max(HAZARD_CONFIG.laserMinimumCycle, cycle * 0.92),
         activeRatio: Math.min(HAZARD_CONFIG.laserMaxActiveRatio, activeRatio + 0.04),
-        phaseTime: seededUnit(safeIndex, 20) * cycle
+        phaseTime: seededUnit(safeIndex, 20) * cycle,
+        sourceSide: safeIndex % 2 === 0 ? "right" : "left"
       }
     });
   }
@@ -1047,7 +1048,7 @@ function bounceOrbFromSurface(state, hit) {
 
   const speed = Math.hypot(state.orb.vx, state.orb.vy);
 
-  if (speed < GAME_CONFIG.restSpeedThreshold) {
+  if (speed < GAME_CONFIG.restSpeedThreshold && state.mode !== "airAiming") {
     state.orb.vx = 0;
     state.orb.vy = 0;
     state.mode = "ready";

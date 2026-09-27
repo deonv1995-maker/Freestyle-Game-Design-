@@ -190,3 +190,11 @@ The survival course is bounded by continuous left and right walls rather than a 
 
 Reason: the space presentation and bottom-to-top play direction should be mechanical truths rather than camera tricks. Rotating the progression source of truth keeps gameplay, hazards, streaming and records consistent and avoids maintaining a second horizontal coordinate model behind vertical presentation.
 
+## 2026-09-27 — Midair re-aim uses slow motion, not a hard freeze
+
+Decision: entering the midair re-aim state slows authoritative gameplay time to 20% rather than stopping it. Orb movement, moving platforms, laser timing, drones, projectiles, invulnerability timers and world simulation all advance using the same scaled gameplay delta while aiming. Camera interpolation remains presentation-time based so the control stays readable and responsive.
+
+Decision: lasers are persistent wall-mounted devices. Their collision beam spans the corridor from one side to the other at a fixed world position. The emitter hardware remains visible continuously; only the beam's active state cycles on and off. Procedural lasers alternate source sides for visual variety without changing collision semantics.
+
+Reason: re-aiming should preserve pressure and momentum instead of becoming a complete pause, while laser hazards should read as physical devices switching power states rather than objects appearing and disappearing.
+
