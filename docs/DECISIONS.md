@@ -198,3 +198,11 @@ Decision: lasers are persistent wall-mounted devices. Their collision beam spans
 
 Reason: re-aiming should preserve pressure and momentum instead of becoming a complete pause, while laser hazards should read as physical devices switching power states rather than objects appearing and disappearing.
 
+## 2026-09-27 — Every active gameplay touch engages slow motion
+
+Decision: slow motion is keyed to an active gameplay pointer rather than only the midair redirect state. The initial launch aim and every later redirect therefore run authoritative gameplay at 20% speed for as long as the player holds the screen. Releasing the touch returns gameplay to full speed.
+
+Decision: persistent laser emitters keep the same wall-to-wall geometry and on/off behavior, but their base cycle is lengthened from 2.8 seconds to 3.6 seconds and the minimum cycle from 1.35 seconds to 1.8 seconds so their timing is easier to read without removing pressure.
+
+Reason: touching the screen should always create the same planning window, and laser timing should feel deliberate rather than flickery.
+
