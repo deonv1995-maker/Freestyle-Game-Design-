@@ -8,7 +8,9 @@ export const GAME_CONFIG = Object.freeze({
   aimDeadzone: 12,
   cameraSharpness: 10,
   handOffset: 30,
-  handHeight: 34
+  handHeight: 34,
+  throwFollowThroughDuration: 0.28,
+  airborneAimVisualTimeScale: 0.18
 });
 
 export const WORLD_CONFIG = Object.freeze({
@@ -101,6 +103,15 @@ export function createGameState() {
       dragDistance: 0
     },
     lastAim: { ...DEFAULT_AIM },
+    animation: {
+      clock: 0,
+      airborneAim: false,
+      playerAirborne: false,
+      airborneAimClock: 0,
+      throwFollowThrough: 0,
+      throwDirectionX: 1,
+      throwDirectionY: 0
+    },
     camera: { ...START_POSITION },
     teleportPulse: 0,
     world: {
@@ -117,7 +128,8 @@ export function createGameState() {
 }
 
 export function beginAim(state, pointerX, pointerY, pointerId = 0) {
-  const teleported = state.mode === "flying" || state.mode === "stuck";
+  const relayedFromFlight = state.mode === "flying";
+  const teleported = relayedFromFlight || state.mode === "stuck";
 
   if (teleported) {
     state.player.x = state.spear.x;
@@ -132,6 +144,11 @@ export function beginAim(state, pointerX, pointerY, pointerId = 0) {
   state.spear.vy = 0;
   state.spear.travel = 0;
   state.spear.contact = null;
+
+  state.animation.airborneAim = relayedFromFlight;
+  state.animation.playerAirborne = relayedFromFlight;
+  state.animation.airborneAimClock = 0;
+  state.animation.throwFollowThrough = 0;
 
   state.aim.pointerId = pointerId;
   state.aim.startX = pointerX;
@@ -196,6 +213,11 @@ export function releaseAim(state, pointerId = state.aim.pointerId) {
   state.spear.travel = 0;
   state.spear.contact = null;
 
+  state.animation.throwDirectionX = dirX;
+  state.animation.throwDirectionY = dirY;
+  state.animation.throwFollowThrough = 1;
+  state.animation.airborneAim = false;
+
   state.mode = "flying";
   state.throwCount += 1;
   state.aim.pointerId = null;
@@ -204,6 +226,19 @@ export function releaseAim(state, pointerId = state.aim.pointerId) {
 
 export function stepGame(state, deltaSeconds) {
   const dt = clamp(deltaSeconds, 0, 0.05);
+
+  state.animation.clock += dt;
+
+  if (state.animation.airborneAim) {
+    state.animation.airborneAimClock += dt * GAME_CONFIG.airborneAimVisualTimeScale;
+  }
+
+  if (state.animation.throwFollowThrough > 0) {
+    state.animation.throwFollowThrough = Math.max(
+      0,
+      state.animation.throwFollowThrough - dt / GAME_CONFIG.throwFollowThroughDuration
+    );
+  }
 
   if (state.mode === "flying") {
     const startX = state.spear.x;
