@@ -40,14 +40,13 @@ export const WORLD_CONFIG = Object.freeze({
 });
 
 export const HAZARD_CONFIG = Object.freeze({
-  spikeDepth: 54,
-  spikeMinSpan: 118,
-  spikeMaxSpan: 188,
   laserHeight: 12,
   laserWallInset: 0,
   laserBaseCycle: 7.2,
   laserMinimumCycle: 3.6,
   laserBeamTravelDuration: 1.8,
+  laserShutdownFlickerDuration: 0.7,
+  laserShutdownFlickerRate: 9,
   laserBaseActiveRatio: 0.5,
   laserMaxActiveRatio: 0.68,
   movingPlatformWidth: 170,
@@ -134,26 +133,6 @@ export const STARTER_SURFACES = Object.freeze([
 ]);
 
 export const STARTER_HAZARDS = Object.freeze([
-  Object.freeze({
-    id: "starter-left-spikes",
-    type: "leftSpikes",
-    visual: "spikes",
-    x: CORRIDOR_LEFT,
-    y: 270,
-    width: HAZARD_CONFIG.spikeDepth,
-    height: 118,
-    active: true
-  }),
-  Object.freeze({
-    id: "starter-right-spikes",
-    type: "rightSpikes",
-    visual: "spikes",
-    x: CORRIDOR_RIGHT - HAZARD_CONFIG.spikeDepth,
-    y: 430,
-    width: HAZARD_CONFIG.spikeDepth,
-    height: 140,
-    active: true
-  }),
   Object.freeze({
     id: "starter-laser",
     type: "laser",
@@ -592,17 +571,6 @@ export function generateHazardChunk(chunkIndex) {
   const safeIndex = Math.max(0, Math.floor(chunkIndex));
   const chunkBottomY = WORLD_CONFIG.proceduralStartY - safeIndex * WORLD_CONFIG.chunkHeight;
   const difficulty = difficultyForChunk(safeIndex);
-  const spikeSpan =
-    HAZARD_CONFIG.spikeMinSpan +
-    Math.round(
-      seededUnit(safeIndex, 2) *
-        (HAZARD_CONFIG.spikeMaxSpan - HAZARD_CONFIG.spikeMinSpan)
-    );
-
-  const leftSpikeY =
-    chunkBottomY - 150 - Math.round(seededUnit(safeIndex, 3) * 150);
-  const rightSpikeY =
-    chunkBottomY - 475 - Math.round(seededUnit(safeIndex, 4) * 135);
 
   const cycle = Math.max(
     HAZARD_CONFIG.laserMinimumCycle,
@@ -617,30 +585,6 @@ export function generateHazardChunk(chunkIndex) {
   const corridorWidth = CORRIDOR_RIGHT - CORRIDOR_LEFT;
 
   const hazards = [
-    {
-      id: `chunk-${safeIndex}-left-spikes-0`,
-      type: "leftSpikes",
-      visual: "spikes",
-      x: CORRIDOR_LEFT,
-      y: leftSpikeY,
-      width: HAZARD_CONFIG.spikeDepth,
-      height: spikeSpan,
-      active: true,
-      chunkIndex: safeIndex,
-      difficulty
-    },
-    {
-      id: `chunk-${safeIndex}-right-spikes-0`,
-      type: "rightSpikes",
-      visual: "spikes",
-      x: CORRIDOR_RIGHT - HAZARD_CONFIG.spikeDepth,
-      y: rightSpikeY,
-      width: HAZARD_CONFIG.spikeDepth,
-      height: Math.max(92, spikeSpan * 0.88),
-      active: true,
-      chunkIndex: safeIndex,
-      difficulty
-    },
     {
       id: `chunk-${safeIndex}-laser-0`,
       type: "laser",
@@ -660,23 +604,6 @@ export function generateHazardChunk(chunkIndex) {
       }
     }
   ];
-
-  if (difficulty >= 4) {
-    const secondY =
-      chunkBottomY - 650 - Math.round(seededUnit(safeIndex, 17) * 70);
-    hazards.push({
-      id: `chunk-${safeIndex}-left-spikes-1`,
-      type: "leftSpikes",
-      visual: "spikes",
-      x: CORRIDOR_LEFT,
-      y: secondY,
-      width: HAZARD_CONFIG.spikeDepth,
-      height: 82 + Math.round(seededUnit(safeIndex, 18) * 48),
-      active: true,
-      chunkIndex: safeIndex,
-      difficulty
-    });
-  }
 
   if (difficulty >= 6) {
     const secondLaserY = chunkBottomY - 610;
@@ -702,7 +629,6 @@ export function generateHazardChunk(chunkIndex) {
 
   return hazards;
 }
-
 
 export function generateDroneChunk(chunkIndex) {
   const safeIndex = Math.max(0, Math.floor(chunkIndex));
@@ -1131,11 +1057,31 @@ function updateDynamicWorld(state) {
         activeDuration
       );
 
+      const shutdownFlickerDuration = Math.min(
+        HAZARD_CONFIG.laserShutdownFlickerDuration,
+        activeDuration
+      );
+      const activeTimeRemaining = activeDuration - phase;
+
       hazard.active = phase < activeDuration;
       hazard.laser.beamProgress =
         hazard.active && beamTravelDuration > 0
           ? clamp(phase / beamTravelDuration, 0, 1)
           : 0;
+      hazard.laser.shutdownFlicker =
+        hazard.active &&
+        activeTimeRemaining <= shutdownFlickerDuration;
+      hazard.laser.flickerLevel = hazard.laser.shutdownFlicker
+        ? Math.floor(
+            (shutdownFlickerDuration - activeTimeRemaining) *
+              HAZARD_CONFIG.laserShutdownFlickerRate *
+              2
+          ) %
+            2 ===
+          0
+          ? 1
+          : 0.35
+        : 1;
     } else {
       hazard.active = true;
     }
