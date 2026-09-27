@@ -49,3 +49,11 @@ Reason: the first test should answer whether throw-follow-relocate-repeat is sat
 Decision: Spear Relay exposes install metadata and a dedicated app icon so the deployed GitHub Pages prototype can be added to a phone home screen and opened in standalone mode.
 
 Reason: one-tap access shortens the test loop without introducing a native packaging pipeline before the core mechanic earns that complexity. No service worker is added yet, because an offline cache can make rapid iteration confusing by serving an older prototype after a deployment.
+
+## 2026-09-27 — Android testing uses a thin native APK shell
+
+Decision: the current browser-native Spear Relay gameplay remains the single source of truth, while a minimal Android WebView shell packages the verified `dist/` output into an installable APK.
+
+Reason: phone testing now requires a real downloadable/installable application, but duplicating gameplay in a second Android implementation would create competing logic and slow iteration.
+
+The Android test package ID is `com.freestylegamedesign.spearrelay`. Automated test APKs use a repository-owned development signing key only so later test builds can update the installed app. That key is explicitly not a production/store signing identity.

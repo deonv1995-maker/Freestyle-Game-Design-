@@ -43,3 +43,15 @@ When test feedback exposes a regression:
 ## Stable build rule
 
 Once a playable baseline exists, do not knowingly leave `main` in a broken state merely to preserve an experiment.
+
+## Android APK verification
+
+For Android test builds, repository verification additionally requires:
+
+- the existing JavaScript tests and static build to pass;
+- the Android project to compile with JDK 17 / Android API 35;
+- an APK to be produced successfully;
+- the APK application ID to be `com.freestylegamedesign.spearrelay`;
+- the APK to be published as the downloadable test artifact/release.
+
+Device testing should install the APK and verify launch, touch aiming, spear throw, camera follow, relocation, and installation-over-previous-build behavior.
