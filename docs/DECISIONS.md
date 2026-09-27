@@ -182,3 +182,11 @@ Decision: a swept solid collision that begins exactly on an expanded collision b
 
 Reason: resting contact and incoming collision are different physical states. Keeping that distinction in the shared collision layer fixes ground liftoff without special-casing input or adding launch-only teleport offsets.
 
+## 2026-09-27 — Zero-gravity vertical space corridor
+
+Decision: Energy Relay's authoritative traversal axis is now vertical, progressing upward as world Y decreases. The orb has no constant gravity acceleration; free-flight velocity is preserved until player redirection, collision response or configured damping changes it.
+
+The survival course is bounded by continuous left and right walls rather than a floor and roof. Procedural chunks stack upward. Moving platforms travel primarily across the corridor, wall spikes project inward, and timed lasers span horizontally while moving vertically. Checkpoint crossing, respawn positions, difficulty progression, distance measurement, camera tracking and streamed-world focus all derive from the same upward-Y progression model.
+
+Reason: the space presentation and bottom-to-top play direction should be mechanical truths rather than camera tricks. Rotating the progression source of truth keeps gameplay, hazards, streaming and records consistent and avoids maintaining a second horizontal coordinate model behind vertical presentation.
+
