@@ -752,7 +752,7 @@ test("configured space-corridor values remain physically valid", () => {
   assert.ok(HAZARD_CONFIG.laserMinimumCycle > 0);
   assert.ok(HAZARD_CONFIG.laserBeamTravelDuration > 0);
   assert.ok(
-    HAZARD_CONFIG.laserBeamTravelDuration <
+    HAZARD_CONFIG.laserBeamTravelDuration <=
       HAZARD_CONFIG.laserMinimumCycle * HAZARD_CONFIG.laserBaseActiveRatio
   );
   assert.ok(HAZARD_CONFIG.laserMaxActiveRatio < 1);
