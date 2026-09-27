@@ -582,7 +582,7 @@ function drawOrb() {
 
 
 function drawSlowMotionField() {
-  if (state.mode !== "airAiming") return;
+  if (state.launch.pointerId === null) return;
 
   const p = worldToScreen(state.orb.x, state.orb.y);
   const phase = state.animation.clock;
@@ -687,24 +687,24 @@ function updateHud() {
 
   if (state.mode === "aiming") {
     statusNode.textContent =
-      `AIMING · POWER ${Math.round(state.launch.power * 100)}% · ${runStats}`;
+      `SLOW MOTION ${Math.round(GAME_CONFIG.touchTimeScale * 100)}% · AIMING · POWER ${Math.round(state.launch.power * 100)}% · ${runStats}`;
     hintNode.textContent =
-      "Drag in the direction you want the orb to travel, then release.";
+      "Time slows as soon as you touch. Drag in the direction you want the orb to travel, then release.";
     return;
   }
 
   if (state.mode === "airAiming") {
     statusNode.textContent =
-      `SLOW MOTION ${Math.round(GAME_CONFIG.airAimTimeScale * 100)}% · POWER ${Math.round(state.launch.power * 100)}% · ${runStats}`;
+      `SLOW MOTION ${Math.round(GAME_CONFIG.touchTimeScale * 100)}% · REDIRECT · POWER ${Math.round(state.launch.power * 100)}% · ${runStats}`;
     hintNode.textContent =
-      "The world keeps moving slowly while you aim. Drag a new direction and release to redirect.";
+      "Time stays slowed while you hold the screen. Drag a new direction and release to redirect.";
     return;
   }
 
   if (state.mode === "orb") {
     statusNode.textContent = `ENERGY FORM · ${runStats}`;
     hintNode.textContent =
-      "Zero gravity: keep your momentum upward, then slow time and redirect around lasers, wall spikes and drones.";
+      "Zero gravity: every touch slows time, giving you a window to redirect around lasers, wall spikes and drones.";
     return;
   }
 
