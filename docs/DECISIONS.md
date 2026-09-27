@@ -165,7 +165,8 @@ Reason: platforms and obstacles should have a clear purpose and visual identity 
 - The playable character remains in energy-orb form permanently. Landing no longer reforms a human character.
 - Solid traversal geometry is restricted to floor, ceiling and moving-platform surfaces. Legacy city obstacle surfaces and NPC target systems are removed from the active gameplay loop.
 - The procedural course is an enclosed corridor with deterministic floor gaps/spike pits, roof spikes, vertically moving platforms and moving lasers that cycle between active and inactive states.
-- Gameplay uses seven lives. Lethal hazards, drones and projectiles consume one life and respawn the orb at the latest checkpoint with brief invulnerability. Losing the seventh life automatically resets the run.
+- Gameplay uses seven lives. Lethal environmental hazards and drone projectiles consume one life and respawn the orb at the latest checkpoint with brief invulnerability. Losing the seventh life automatically resets the run.
+- Direct orb contact destroys drones instead of damaging the player. Destroyed drone IDs are retained only while their streamed definitions remain active, so nearby chunk refreshes cannot visibly respawn a destroyed drone while long-run state remains bounded.
 - Each procedural chunk ends with a checkpoint. Checkpoint progression is the source of truth for respawn position and difficulty advancement.
 - Difficulty is data-driven from checkpoint/chunk progression: moving-platform speed/range, laser timing and density, ceiling-spike density, drone count/speed, projectile speed and fire interval scale upward within explicit caps.
 - Drones and their projectiles remain slower than the orb's maximum configured speed so evasion remains player-controlled rather than unavoidable.
@@ -174,4 +175,10 @@ Reason: platforms and obstacles should have a clear purpose and visual identity 
 - World surfaces, hazards, checkpoints, drones and projectiles remain bounded through streamed chunk windows to preserve mobile performance and long-run scalability.
 
 Reason: the game is now centered on momentum survival and precision redirection instead of defeating NPCs or landing to transform back. The new boundaries keep hazards, progression, persistence and rendering separable for future expansion.
+
+## 2026-09-27 — Settled-contact launch collision rule
+
+Decision: a swept solid collision that begins exactly on an expanded collision boundary is ignored when the orb's movement is leaving that boundary. This allows a settled orb to launch directly away from the floor, roof or platform instead of treating the starting contact as a new impact at time zero.
+
+Reason: resting contact and incoming collision are different physical states. Keeping that distinction in the shared collision layer fixes ground liftoff without special-casing input or adding launch-only teleport offsets.
 
