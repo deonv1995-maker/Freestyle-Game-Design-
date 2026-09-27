@@ -385,9 +385,15 @@ test("nearby drones eventually fire targeted projectiles", () => {
 test("orb contact destroys a drone without costing a life", () => {
   const state = createGameState();
   const drone = getWorldDrones(state).find(
-    (candidate) => candidate.id === "starter-drone-0"
+    (candidate) => candidate.id === "chunk-0-drone-0"
   );
   const startingLives = state.lives;
+
+  // Isolate direct orb/drone contact from the starter laser and spike fields.
+  drone.x = 1460;
+  drone.y = -230;
+  drone.homeX = drone.x;
+  drone.homeY = drone.y;
 
   state.mode = "orb";
   state.orb.x = drone.x - 62;
