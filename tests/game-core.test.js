@@ -136,7 +136,12 @@ test("pressing during orb flight slows gameplay instead of freezing it", () => {
     slow.world.clock,
     0.05 * GAME_CONFIG.airAimTimeScale
   );
+  assert.equal(
+    slow.animation.clock,
+    0.05 * GAME_CONFIG.airAimTimeScale
+  );
   assert.equal(normal.world.clock, 0.05);
+  assert.equal(normal.animation.clock, 0.05);
 
   const slowDx = slow.orb.x;
   const slowDy = 500 - slow.orb.y;
