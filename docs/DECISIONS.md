@@ -126,3 +126,14 @@ The orb uses the existing deterministic world collision and bounded streamed NPC
 Gameplay physics and input state remain in `game-core.js`; split-screen gesture routing, slingshot/joystick presentation, blue energy rendering and HUD copy remain in `game.js`.
 
 Reason: the mechanic should read as a superpower rather than a projectile tool while preserving the successful traversal architecture, mobile-first two-thumb ergonomics, deterministic collision, bounded streaming and one authoritative gameplay simulation.
+
+
+## 2026-09-27 — Prototype 0.8 restores direct aiming and separates rebound from landing
+
+Decision: the split left-initiation/right-steering control scheme from 0.7 is removed. Energy Relay returns to the earlier one-finger motion contract: a press can begin anywhere on the game area, drag direction is the launch direction, drag distance sets power, and release transforms the player into the existing energy orb and launches it. The orb presentation remains unchanged.
+
+World contact is no longer treated as one universal stop condition. The orb is collision-tested as a circle by sweeping its center against world rectangles expanded by the orb radius. A contact is considered a valid landing only when all three conditions are true: the orb is descending, the collision normal is the top-face normal, and the surface type is either ground or platform.
+
+All other solid-world contacts are rebounds. Side impacts reflect horizontal momentum, underside impacts reflect vertical momentum, and obstacle surfaces—including obstacle tops—reflect the orb instead of reforming the player. A small separation offset is applied after reflection so the next physics step begins outside the contact boundary and does not repeatedly re-hit the same face.
+
+Reason: the character should never hang from a wall, platform edge or ceiling. Landing/reforming is a semantic gameplay action reserved for standable top surfaces, while non-standable geometry behaves as a physical rebound surface.
