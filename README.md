@@ -4,16 +4,16 @@ An experimental game-design repository for rapidly turning ideas into playable p
 
 This project is intentionally open-ended. It may become one game, several experiments, or a place to test unusual mechanics before deciding what deserves deeper development.
 
-## Current playable slice — Spear Relay 0.1
+## Current playable slice — Spear Relay 0.2
 
-The first prototype is a mobile-first 2D traversal mechanic:
+The current prototype is a mobile-first 2D traversal mechanic:
 
 - press and hold anywhere on the game area;
 - slide in the direction you want to throw;
 - drag distance controls throw power;
 - release to throw the spear;
 - while the spear is flying, the camera follows it;
-- press again to relocate the character to the spear's exact current position;
+- the spear now collides with the floor, platforms and solid obstacles instead of passing through them;\n- press again while the spear is flying or planted to relocate the character to the spear's current position;
 - that same press immediately starts the next aiming gesture.
 
 This deliberately tests the movement loop before adding enemies, platforms, progression, art production or a larger game concept.
@@ -24,9 +24,9 @@ The spear uses light ballistic gravity. There is no terrain collision or death s
 
 The first prototype uses browser-native HTML5 Canvas and JavaScript with no runtime dependencies.
 
-Gameplay state/physics live in `src/game-core.js`. Pointer input, rendering and HUD presentation live in `src/game.js`.
+Gameplay state, world geometry and collision physics live in `src/game-core.js`. Pointer input, rendering and HUD presentation live in `src/game.js`.
 
-The static build is produced by `scripts/build.mjs`, and the repository includes automated gameplay-state tests plus GitHub Actions verification.
+The static build is produced by `scripts/build.mjs`, and the repository includes automated gameplay-state and collision tests plus GitHub Actions verification.
 
 This choice is intentionally lightweight. It is not a permanent commitment to a larger engine if future experiments require one.
 
@@ -38,7 +38,7 @@ A service worker is intentionally not used yet. Keeping the prototype free of an
 
 ## Local commands
 
-- `npm test` — run core mechanic tests.
+- `npm test` — run core mechanic and collision tests.
 - `npm run build` — build the static site into `dist/`.
 - `npm run check` — run tests and build together.
 
