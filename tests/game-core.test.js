@@ -3,8 +3,10 @@ import assert from "node:assert/strict";
 
 import {
   GAME_CONFIG,
+  WORLD_SURFACES,
   beginAim,
   createGameState,
+  findEarliestSurfaceCollision,
   releaseAim,
   stepGame,
   updateAim
@@ -48,7 +50,7 @@ test("pressing during flight relocates the character to the spear and starts aim
   beginAim(state, 0, 0, 3);
   updateAim(state, 180, -80, 3);
   releaseAim(state, 3);
-  stepGame(state, 0.2);
+  stepGame(state, 0.02);
 
   const spearX = state.spear.x;
   const spearY = state.spear.y;
@@ -87,4 +89,60 @@ test("a short tap still throws using the previous aim instead of producing zero 
 
   assert.equal(state.mode, "flying");
   assert.ok(Math.hypot(state.spear.vx, state.spear.vy) >= GAME_CONFIG.minThrowSpeed);
+});
+
+
+test("world surfaces are unique valid rectangles", () => {
+  const ids = new Set();
+
+  for (const surface of WORLD_SURFACES) {
+    assert.ok(surface.width > 0);
+    assert.ok(surface.height > 0);
+    assert.ok(["ground", "platform", "obstacle"].includes(surface.type));
+    assert.equal(ids.has(surface.id), false);
+    ids.add(surface.id);
+  }
+});
+
+test("swept collision catches a fast spear crossing an obstacle", () => {
+  const hit = findEarliestSurfaceCollision(300, 100, 430, 100);
+
+  assert.ok(hit);
+  assert.equal(hit.surface.id, "wall-a");
+  assert.equal(hit.x, 340);
+  assert.equal(hit.normalX, -1);
+});
+
+test("falling spear sticks to the ground instead of passing through it", () => {
+  const state = createGameState();
+  state.mode = "flying";
+  state.spear.x = 0;
+  state.spear.y = 120;
+  state.spear.vx = 0;
+  state.spear.vy = 600;
+
+  for (let i = 0; i < 10 && state.mode === "flying"; i += 1) {
+    stepGame(state, 0.05);
+  }
+
+  assert.equal(state.mode, "stuck");
+  assert.equal(state.spear.y, 180);
+  assert.equal(state.spear.contact.surfaceId, "ground");
+  assert.equal(state.spear.vx, 0);
+  assert.equal(state.spear.vy, 0);
+});
+
+test("pressing a stuck spear relays the character to its collision point", () => {
+  const state = createGameState();
+  state.mode = "stuck";
+  state.spear.x = 340;
+  state.spear.y = 100;
+  state.spear.contact = { surfaceId: "wall-a", normalX: -1, normalY: 0 };
+
+  const result = beginAim(state, 20, 20, 8);
+
+  assert.equal(result.teleported, true);
+  assert.equal(state.player.x, 340);
+  assert.equal(state.player.y, 100);
+  assert.equal(state.mode, "aiming");
 });
