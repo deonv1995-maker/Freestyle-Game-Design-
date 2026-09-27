@@ -96,6 +96,112 @@ test("launch transforms the player into the same blue energy-orb gameplay state"
   assert.equal(state.animation.transformPulse, 1);
 });
 
+test("pressing during orb flight freezes the orb and gameplay for re-aiming", () => {
+  const state = createGameState();
+  const walkingNpc = getWorldNpcs(state).find((npc) => npc.mode === "walking");
+
+  state.mode = "orb";
+  state.orb.active = true;
+  state.orb.x = 260;
+  state.orb.y = 40;
+  state.orb.vx = 520;
+  state.orb.vy = -180;
+
+  const orbX = state.orb.x;
+  const orbY = state.orb.y;
+  const orbVx = state.orb.vx;
+  const orbVy = state.orb.vy;
+  const npcX = walkingNpc?.x;
+
+  assert.equal(beginAim(state, 400, 220, 21), true);
+  assert.equal(state.mode, "airAiming");
+
+  stepGame(state, 0.05);
+
+  assert.equal(state.orb.x, orbX);
+  assert.equal(state.orb.y, orbY);
+  assert.equal(state.orb.vx, orbVx);
+  assert.equal(state.orb.vy, orbVy);
+  if (walkingNpc) assert.equal(walkingNpc.x, npcX);
+});
+
+test("midair re-aim redirects the same orb without creating a new burst", () => {
+  const state = createGameState();
+
+  state.mode = "orb";
+  state.orb.active = true;
+  state.orb.x = 310;
+  state.orb.y = 25;
+  state.orb.vx = 600;
+  state.orb.vy = 80;
+  state.burstCount = 3;
+
+  assert.equal(beginAim(state, 500, 250, 22), true);
+  assert.equal(updateAim(state, 390, 150, 22), true);
+
+  const frozenX = state.orb.x;
+  const frozenY = state.orb.y;
+
+  assert.equal(releaseAim(state, 22), true);
+
+  assert.equal(state.mode, "orb");
+  assert.equal(state.orb.active, true);
+  assert.equal(state.orb.x, frozenX);
+  assert.equal(state.orb.y, frozenY);
+  assert.ok(state.orb.vx < 0);
+  assert.ok(state.orb.vy < 0);
+  assert.equal(state.burstCount, 3);
+});
+
+test("cancelling a midair re-aim resumes the original trajectory", () => {
+  const state = createGameState();
+
+  state.mode = "orb";
+  state.orb.active = true;
+  state.orb.x = 250;
+  state.orb.y = 10;
+  state.orb.vx = 430;
+  state.orb.vy = -210;
+
+  const originalVx = state.orb.vx;
+  const originalVy = state.orb.vy;
+
+  beginAim(state, 420, 210, 23);
+  updateAim(state, 320, 310, 23);
+
+  assert.equal(cancelAim(state, 23), true);
+  assert.equal(state.mode, "orb");
+  assert.equal(state.orb.vx, originalVx);
+  assert.equal(state.orb.vy, originalVy);
+});
+
+test("orb can freeze and redirect repeatedly during one airborne burst", () => {
+  const state = createGameState();
+
+  state.mode = "orb";
+  state.orb.active = true;
+  state.orb.x = 240;
+  state.orb.y = 0;
+  state.orb.vx = 500;
+  state.orb.vy = -120;
+  state.burstCount = 1;
+
+  beginAim(state, 400, 200, 24);
+  updateAim(state, 470, 120, 24);
+  releaseAim(state, 24);
+  assert.ok(state.orb.vx > 0);
+  assert.ok(state.orb.vy < 0);
+
+  beginAim(state, 420, 220, 25);
+  updateAim(state, 350, 300, 25);
+  releaseAim(state, 25);
+
+  assert.equal(state.mode, "orb");
+  assert.ok(state.orb.vx < 0);
+  assert.ok(state.orb.vy > 0);
+  assert.equal(state.burstCount, 1);
+});
+
 test("orb radius participates in swept world collision", () => {
   const state = createGameState();
   const hit = findEarliestSurfaceCollision(
