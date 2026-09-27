@@ -1,9 +1,11 @@
-const GROUND_TOP = 180;
-const CEILING_BOTTOM = -520;
-const START_POSITION = Object.freeze({ x: -120, y: GROUND_TOP - 16 });
+
+const CORRIDOR_LEFT = -230;
+const CORRIDOR_RIGHT = 230;
+const START_Y = 520;
+const START_POSITION = Object.freeze({ x: 0, y: START_Y });
 
 export const GAME_CONFIG = Object.freeze({
-  orbGravity: 240,
+  orbGravity: 0,
   minLaunchSpeed: 280,
   maxLaunchSpeed: 980,
   maxAimDistance: 220,
@@ -22,11 +24,13 @@ export const GAME_CONFIG = Object.freeze({
 
 export const WORLD_CONFIG = Object.freeze({
   seed: 2000,
-  groundTop: GROUND_TOP,
-  ceilingBottom: CEILING_BOTTOM,
+  corridorLeft: CORRIDOR_LEFT,
+  corridorRight: CORRIDOR_RIGHT,
+  corridorCenterX: (CORRIDOR_LEFT + CORRIDOR_RIGHT) * 0.5,
   structuralThickness: 90,
-  proceduralStartX: 1200,
-  chunkWidth: 820,
+  starterBottomY: 680,
+  proceduralStartY: 220,
+  chunkHeight: 820,
   chunksBehind: 2,
   chunksAhead: 4,
   checkpointInset: 86,
@@ -35,11 +39,10 @@ export const WORLD_CONFIG = Object.freeze({
 });
 
 export const HAZARD_CONFIG = Object.freeze({
-  pitMinWidth: 118,
-  pitMaxWidth: 188,
-  floorSpikeHeight: 54,
-  ceilingSpikeHeight: 56,
-  laserWidth: 12,
+  spikeDepth: 54,
+  spikeMinSpan: 118,
+  spikeMaxSpan: 188,
+  laserHeight: 12,
   laserMoveRange: 86,
   laserBaseCycle: 2.8,
   laserMinimumCycle: 1.35,
@@ -70,52 +73,44 @@ export const DRONE_CONFIG = Object.freeze({
 });
 
 const DEFAULT_LAUNCH = Object.freeze({
-  dx: 150,
-  dy: -72,
+  dx: 0,
+  dy: -150,
   power: 0.58
 });
 
+
 export const STARTER_SURFACES = Object.freeze([
   Object.freeze({
-    id: "starter-floor-left",
-    type: "floor",
-    visual: "corridorFloor",
-    x: -1800,
-    y: GROUND_TOP,
-    width: 2580,
-    height: WORLD_CONFIG.structuralThickness
+    id: "starter-left-wall",
+    type: "leftWall",
+    visual: "corridorWall",
+    x: CORRIDOR_LEFT - WORLD_CONFIG.structuralThickness,
+    y: WORLD_CONFIG.proceduralStartY,
+    width: WORLD_CONFIG.structuralThickness,
+    height: WORLD_CONFIG.starterBottomY - WORLD_CONFIG.proceduralStartY
   }),
   Object.freeze({
-    id: "starter-floor-right",
-    type: "floor",
-    visual: "corridorFloor",
-    x: 920,
-    y: GROUND_TOP,
-    width: WORLD_CONFIG.proceduralStartX - 920,
-    height: WORLD_CONFIG.structuralThickness
-  }),
-  Object.freeze({
-    id: "starter-roof",
-    type: "ceiling",
-    visual: "corridorRoof",
-    x: -1800,
-    y: CEILING_BOTTOM - WORLD_CONFIG.structuralThickness,
-    width: WORLD_CONFIG.proceduralStartX + 1800,
-    height: WORLD_CONFIG.structuralThickness
+    id: "starter-right-wall",
+    type: "rightWall",
+    visual: "corridorWall",
+    x: CORRIDOR_RIGHT,
+    y: WORLD_CONFIG.proceduralStartY,
+    width: WORLD_CONFIG.structuralThickness,
+    height: WORLD_CONFIG.starterBottomY - WORLD_CONFIG.proceduralStartY
   }),
   Object.freeze({
     id: "starter-moving-platform",
     type: "platform",
     visual: "movingPlatform",
-    x: 500,
-    y: -110,
+    x: -85,
+    y: 350,
     width: HAZARD_CONFIG.movingPlatformWidth,
     height: HAZARD_CONFIG.movingPlatformHeight,
     motion: Object.freeze({
-      axis: "y",
-      baseX: 500,
-      baseY: -110,
-      range: 86,
+      axis: "x",
+      baseX: -85,
+      baseY: 350,
+      range: 96,
       speed: 1.05,
       phase: 0.45
     })
@@ -124,38 +119,38 @@ export const STARTER_SURFACES = Object.freeze([
 
 export const STARTER_HAZARDS = Object.freeze([
   Object.freeze({
-    id: "starter-ceiling-spikes",
-    type: "ceilingSpikes",
+    id: "starter-left-spikes",
+    type: "leftSpikes",
     visual: "spikes",
-    x: 260,
-    y: CEILING_BOTTOM,
-    width: 118,
-    height: HAZARD_CONFIG.ceilingSpikeHeight,
+    x: CORRIDOR_LEFT,
+    y: 270,
+    width: HAZARD_CONFIG.spikeDepth,
+    height: 118,
     active: true
   }),
   Object.freeze({
-    id: "starter-pit-spikes",
-    type: "floorSpikes",
+    id: "starter-right-spikes",
+    type: "rightSpikes",
     visual: "spikes",
-    x: 780,
-    y: GROUND_TOP - 34,
-    width: 140,
-    height: HAZARD_CONFIG.floorSpikeHeight + 48,
+    x: CORRIDOR_RIGHT - HAZARD_CONFIG.spikeDepth,
+    y: 430,
+    width: HAZARD_CONFIG.spikeDepth,
+    height: 140,
     active: true
   }),
   Object.freeze({
     id: "starter-laser",
     type: "laser",
     visual: "laser",
-    x: 1060,
-    y: CEILING_BOTTOM + 42,
-    width: HAZARD_CONFIG.laserWidth,
-    height: GROUND_TOP - CEILING_BOTTOM - 84,
+    x: CORRIDOR_LEFT + 42,
+    y: 315,
+    width: CORRIDOR_RIGHT - CORRIDOR_LEFT - 84,
+    height: HAZARD_CONFIG.laserHeight,
     active: true,
     motion: Object.freeze({
-      axis: "x",
-      baseX: 1060,
-      baseY: CEILING_BOTTOM + 42,
+      axis: "y",
+      baseX: CORRIDOR_LEFT + 42,
+      baseY: 315,
       range: 58,
       speed: 0.72,
       phase: 1.1
@@ -172,10 +167,10 @@ const STARTER_DRONES = Object.freeze([
   Object.freeze({
     id: "starter-drone-0",
     chunkIndex: null,
-    x: 1120,
-    y: -230,
-    homeX: 1120,
-    homeY: -230,
+    x: 105,
+    y: 270,
+    homeX: 105,
+    homeY: 270,
     difficulty: 1,
     speed: 220,
     fireInterval: 1.9,
@@ -222,15 +217,16 @@ export function createGameState() {
     },
     camera: { x: START_POSITION.x, y: START_POSITION.y },
     progress: {
-      startX: START_POSITION.x,
+      startY: START_POSITION.y,
       currentMetres: 0,
       furthestMetres: 0,
-      maxProgressX: START_POSITION.x,
+      minProgressY: START_POSITION.y,
       difficultyLevel: 1
     },
     checkpoint: {
       index: 0,
       x: START_POSITION.x,
+      y: START_POSITION.y,
       spawnX: START_POSITION.x,
       spawnY: START_POSITION.y
     },
@@ -388,7 +384,7 @@ export function stepGame(state, deltaSeconds) {
     state.world.clock += dt;
     state.orb.invulnerability = Math.max(0, state.orb.invulnerability - dt);
 
-    refreshWorldForFocus(state, state.orb.x);
+    refreshWorldForFocus(state, state.orb.y);
     updateDynamicWorld(state);
     updateDrones(state, dt);
     advanceProjectiles(state, dt);
@@ -403,7 +399,7 @@ export function stepGame(state, deltaSeconds) {
     updateCheckpointProgress(state);
     pruneProjectiles(state);
   } else {
-    refreshWorldForFocus(state, state.orb.x);
+    refreshWorldForFocus(state, state.orb.y);
     updateDynamicWorld(state);
   }
 
@@ -439,8 +435,9 @@ export function getWorldProjectiles(state) {
   return state.world.projectiles;
 }
 
-export function refreshWorldForFocus(state, focusX) {
-  const focusChunk = getChunkIndexForX(focusX);
+
+export function refreshWorldForFocus(state, focusY) {
+  const focusChunk = getChunkIndexForY(focusY);
   const startChunk = Math.max(0, focusChunk - WORLD_CONFIG.chunksBehind);
   const endChunk = focusChunk + WORLD_CONFIG.chunksAhead;
 
@@ -490,76 +487,59 @@ export function refreshWorldForFocus(state, focusX) {
   return true;
 }
 
+
 export function generateWorldChunk(chunkIndex) {
   const safeIndex = Math.max(0, Math.floor(chunkIndex));
-  const chunkX = WORLD_CONFIG.proceduralStartX + safeIndex * WORLD_CONFIG.chunkWidth;
+  const chunkBottomY = WORLD_CONFIG.proceduralStartY - safeIndex * WORLD_CONFIG.chunkHeight;
+  const chunkTopY = chunkBottomY - WORLD_CONFIG.chunkHeight;
   const difficulty = difficultyForChunk(safeIndex);
-  const pitWidth =
-    HAZARD_CONFIG.pitMinWidth +
-    Math.round(
-      seededUnit(safeIndex, 2) * (HAZARD_CONFIG.pitMaxWidth - HAZARD_CONFIG.pitMinWidth)
-    );
-  const pitX =
-    chunkX +
-    285 +
-    Math.round(seededUnit(safeIndex, 3) * 185);
-  const safeEnd = chunkX + WORLD_CONFIG.chunkWidth - WORLD_CONFIG.checkpointSafeRadius;
-  const clampedPitX = Math.min(pitX, safeEnd - pitWidth - 28);
-
-  const topPlatformX = chunkX + 155 + Math.round(seededUnit(safeIndex, 6) * 80);
-  const bottomPlatformX = chunkX + 520 + Math.round(seededUnit(safeIndex, 7) * 70);
   const motionSpeed =
     HAZARD_CONFIG.movingPlatformBaseSpeed + Math.min(0.75, (difficulty - 1) * 0.07);
   const motionRange =
     HAZARD_CONFIG.movingPlatformRange + Math.min(48, (difficulty - 1) * 5);
 
+  const lowerPlatformY =
+    chunkBottomY - 235 - Math.round(seededUnit(safeIndex, 6) * 70);
+  const upperPlatformY =
+    chunkBottomY - 565 - Math.round(seededUnit(safeIndex, 7) * 80);
+
   return [
     {
-      id: `chunk-${safeIndex}-floor-a`,
-      type: "floor",
-      visual: "corridorFloor",
-      x: chunkX,
-      y: GROUND_TOP,
-      width: Math.max(24, clampedPitX - chunkX),
-      height: WORLD_CONFIG.structuralThickness,
+      id: `chunk-${safeIndex}-left-wall`,
+      type: "leftWall",
+      visual: "corridorWall",
+      x: CORRIDOR_LEFT - WORLD_CONFIG.structuralThickness,
+      y: chunkTopY,
+      width: WORLD_CONFIG.structuralThickness,
+      height: WORLD_CONFIG.chunkHeight,
       chunkIndex: safeIndex
     },
     {
-      id: `chunk-${safeIndex}-floor-b`,
-      type: "floor",
-      visual: "corridorFloor",
-      x: clampedPitX + pitWidth,
-      y: GROUND_TOP,
-      width: chunkX + WORLD_CONFIG.chunkWidth - (clampedPitX + pitWidth),
-      height: WORLD_CONFIG.structuralThickness,
-      chunkIndex: safeIndex
-    },
-    {
-      id: `chunk-${safeIndex}-roof`,
-      type: "ceiling",
-      visual: "corridorRoof",
-      x: chunkX,
-      y: CEILING_BOTTOM - WORLD_CONFIG.structuralThickness,
-      width: WORLD_CONFIG.chunkWidth,
-      height: WORLD_CONFIG.structuralThickness,
+      id: `chunk-${safeIndex}-right-wall`,
+      type: "rightWall",
+      visual: "corridorWall",
+      x: CORRIDOR_RIGHT,
+      y: chunkTopY,
+      width: WORLD_CONFIG.structuralThickness,
+      height: WORLD_CONFIG.chunkHeight,
       chunkIndex: safeIndex
     },
     makeMovingPlatform(
-      `chunk-${safeIndex}-top-platform`,
+      `chunk-${safeIndex}-left-platform`,
       safeIndex,
-      topPlatformX,
-      CEILING_BOTTOM + 126,
-      "y",
+      CORRIDOR_LEFT + 58,
+      lowerPlatformY,
+      "x",
       motionRange,
       motionSpeed,
       seededUnit(safeIndex, 8) * Math.PI * 2
     ),
     makeMovingPlatform(
-      `chunk-${safeIndex}-bottom-platform`,
+      `chunk-${safeIndex}-right-platform`,
       safeIndex,
-      bottomPlatformX,
-      GROUND_TOP - 178,
-      "y",
+      CORRIDOR_RIGHT - HAZARD_CONFIG.movingPlatformWidth - 58,
+      upperPlatformY,
+      "x",
       motionRange * 0.82,
       motionSpeed * 1.08,
       seededUnit(safeIndex, 9) * Math.PI * 2
@@ -567,19 +547,22 @@ export function generateWorldChunk(chunkIndex) {
   ];
 }
 
+
 export function generateHazardChunk(chunkIndex) {
   const safeIndex = Math.max(0, Math.floor(chunkIndex));
-  const chunkX = WORLD_CONFIG.proceduralStartX + safeIndex * WORLD_CONFIG.chunkWidth;
+  const chunkBottomY = WORLD_CONFIG.proceduralStartY - safeIndex * WORLD_CONFIG.chunkHeight;
   const difficulty = difficultyForChunk(safeIndex);
-  const surfaces = generateWorldChunk(safeIndex);
-  const floorA = surfaces.find((surface) => surface.id.endsWith("floor-a"));
-  const floorB = surfaces.find((surface) => surface.id.endsWith("floor-b"));
-  const pitX = floorA.x + floorA.width;
-  const pitWidth = floorB.x - pitX;
+  const spikeSpan =
+    HAZARD_CONFIG.spikeMinSpan +
+    Math.round(
+      seededUnit(safeIndex, 2) *
+        (HAZARD_CONFIG.spikeMaxSpan - HAZARD_CONFIG.spikeMinSpan)
+    );
 
-  const ceilingSpikeWidth = 92 + Math.round(seededUnit(safeIndex, 12) * 54);
-  const ceilingSpikeX =
-    chunkX + 90 + Math.round(seededUnit(safeIndex, 13) * 150);
+  const leftSpikeY =
+    chunkBottomY - 150 - Math.round(seededUnit(safeIndex, 3) * 150);
+  const rightSpikeY =
+    chunkBottomY - 475 - Math.round(seededUnit(safeIndex, 4) * 135);
 
   const cycle = Math.max(
     HAZARD_CONFIG.laserMinimumCycle,
@@ -589,32 +572,34 @@ export function generateHazardChunk(chunkIndex) {
     HAZARD_CONFIG.laserMaxActiveRatio,
     HAZARD_CONFIG.laserBaseActiveRatio + (difficulty - 1) * 0.018
   );
-  const laserX = chunkX + 555 + Math.round(seededUnit(safeIndex, 14) * 60);
+  const laserY =
+    chunkBottomY - 330 - Math.round(seededUnit(safeIndex, 14) * 90);
   const laserRange =
     HAZARD_CONFIG.laserMoveRange + Math.min(50, (difficulty - 1) * 4);
   const laserSpeed = 0.72 + Math.min(0.68, (difficulty - 1) * 0.055);
+  const corridorWidth = CORRIDOR_RIGHT - CORRIDOR_LEFT;
 
   const hazards = [
     {
-      id: `chunk-${safeIndex}-pit-spikes`,
-      type: "floorSpikes",
+      id: `chunk-${safeIndex}-left-spikes-0`,
+      type: "leftSpikes",
       visual: "spikes",
-      x: pitX,
-      y: GROUND_TOP - 34,
-      width: pitWidth,
-      height: HAZARD_CONFIG.floorSpikeHeight + 48,
+      x: CORRIDOR_LEFT,
+      y: leftSpikeY,
+      width: HAZARD_CONFIG.spikeDepth,
+      height: spikeSpan,
       active: true,
       chunkIndex: safeIndex,
       difficulty
     },
     {
-      id: `chunk-${safeIndex}-ceiling-spikes-0`,
-      type: "ceilingSpikes",
+      id: `chunk-${safeIndex}-right-spikes-0`,
+      type: "rightSpikes",
       visual: "spikes",
-      x: ceilingSpikeX,
-      y: CEILING_BOTTOM,
-      width: ceilingSpikeWidth,
-      height: HAZARD_CONFIG.ceilingSpikeHeight,
+      x: CORRIDOR_RIGHT - HAZARD_CONFIG.spikeDepth,
+      y: rightSpikeY,
+      width: HAZARD_CONFIG.spikeDepth,
+      height: Math.max(92, spikeSpan * 0.88),
       active: true,
       chunkIndex: safeIndex,
       difficulty
@@ -623,17 +608,17 @@ export function generateHazardChunk(chunkIndex) {
       id: `chunk-${safeIndex}-laser-0`,
       type: "laser",
       visual: "laser",
-      x: laserX,
-      y: CEILING_BOTTOM + 42,
-      width: HAZARD_CONFIG.laserWidth,
-      height: GROUND_TOP - CEILING_BOTTOM - 84,
+      x: CORRIDOR_LEFT + 42,
+      y: laserY,
+      width: corridorWidth - 84,
+      height: HAZARD_CONFIG.laserHeight,
       active: true,
       chunkIndex: safeIndex,
       difficulty,
       motion: {
-        axis: "x",
-        baseX: laserX,
-        baseY: CEILING_BOTTOM + 42,
+        axis: "y",
+        baseX: CORRIDOR_LEFT + 42,
+        baseY: laserY,
         range: laserRange,
         speed: laserSpeed,
         phase: seededUnit(safeIndex, 15) * Math.PI * 2
@@ -647,15 +632,16 @@ export function generateHazardChunk(chunkIndex) {
   ];
 
   if (difficulty >= 4) {
-    const secondX = chunkX + 330 + Math.round(seededUnit(safeIndex, 17) * 90);
+    const secondY =
+      chunkBottomY - 650 - Math.round(seededUnit(safeIndex, 17) * 70);
     hazards.push({
-      id: `chunk-${safeIndex}-ceiling-spikes-1`,
-      type: "ceilingSpikes",
+      id: `chunk-${safeIndex}-left-spikes-1`,
+      type: "leftSpikes",
       visual: "spikes",
-      x: secondX,
-      y: CEILING_BOTTOM,
-      width: 78 + Math.round(seededUnit(safeIndex, 18) * 42),
-      height: HAZARD_CONFIG.ceilingSpikeHeight,
+      x: CORRIDOR_LEFT,
+      y: secondY,
+      width: HAZARD_CONFIG.spikeDepth,
+      height: 82 + Math.round(seededUnit(safeIndex, 18) * 48),
       active: true,
       chunkIndex: safeIndex,
       difficulty
@@ -663,22 +649,22 @@ export function generateHazardChunk(chunkIndex) {
   }
 
   if (difficulty >= 6) {
-    const secondLaserX = chunkX + 385;
+    const secondLaserY = chunkBottomY - 610;
     hazards.push({
       id: `chunk-${safeIndex}-laser-1`,
       type: "laser",
       visual: "laser",
-      x: secondLaserX,
-      y: CEILING_BOTTOM + 62,
-      width: HAZARD_CONFIG.laserWidth,
-      height: GROUND_TOP - CEILING_BOTTOM - 124,
+      x: CORRIDOR_LEFT + 62,
+      y: secondLaserY,
+      width: corridorWidth - 124,
+      height: HAZARD_CONFIG.laserHeight,
       active: true,
       chunkIndex: safeIndex,
       difficulty,
       motion: {
-        axis: "x",
-        baseX: secondLaserX,
-        baseY: CEILING_BOTTOM + 62,
+        axis: "y",
+        baseX: CORRIDOR_LEFT + 62,
+        baseY: secondLaserY,
         range: Math.max(44, laserRange * 0.65),
         speed: laserSpeed * 1.12,
         phase: seededUnit(safeIndex, 19) * Math.PI * 2
@@ -694,27 +680,30 @@ export function generateHazardChunk(chunkIndex) {
   return hazards;
 }
 
+
 export function generateDroneChunk(chunkIndex) {
   const safeIndex = Math.max(0, Math.floor(chunkIndex));
-  const chunkX = WORLD_CONFIG.proceduralStartX + safeIndex * WORLD_CONFIG.chunkWidth;
+  const chunkBottomY = WORLD_CONFIG.proceduralStartY - safeIndex * WORLD_CONFIG.chunkHeight;
   const difficulty = difficultyForChunk(safeIndex);
   const count = Math.min(
     DRONE_CONFIG.maxPerChunk,
     DRONE_CONFIG.basePerChunk + Math.floor((difficulty - 1) / 3)
   );
   const drones = [];
+  const usableWidth =
+    CORRIDOR_RIGHT - CORRIDOR_LEFT - DRONE_CONFIG.corridorPadding * 2;
 
   for (let index = 0; index < count; index += 1) {
     const lane = (index + 1) / (count + 1);
     const x =
-      chunkX +
-      250 +
-      lane * 420 +
-      (seededUnit(safeIndex, 30 + index) - 0.5) * 80;
+      CORRIDOR_LEFT +
+      DRONE_CONFIG.corridorPadding +
+      seededUnit(safeIndex, 30 + index) * usableWidth;
     const y =
-      CEILING_BOTTOM +
-      165 +
-      seededUnit(safeIndex, 40 + index) * 320;
+      chunkBottomY -
+      120 -
+      lane * (WORLD_CONFIG.chunkHeight - 240) +
+      (seededUnit(safeIndex, 40 + index) - 0.5) * 60;
     const speed = Math.min(
       DRONE_CONFIG.maxSpeed,
       DRONE_CONFIG.minSpeed + (difficulty - 1) * 16 + seededUnit(safeIndex, 50 + index) * 34
@@ -747,17 +736,20 @@ export function generateDroneChunk(chunkIndex) {
   return drones;
 }
 
+
 export function generateCheckpoint(chunkIndex) {
   const safeIndex = Math.max(0, Math.floor(chunkIndex));
-  const chunkX = WORLD_CONFIG.proceduralStartX + safeIndex * WORLD_CONFIG.chunkWidth;
-  const x = chunkX + WORLD_CONFIG.chunkWidth - WORLD_CONFIG.checkpointInset;
+  const chunkBottomY = WORLD_CONFIG.proceduralStartY - safeIndex * WORLD_CONFIG.chunkHeight;
+  const y =
+    chunkBottomY - WORLD_CONFIG.chunkHeight + WORLD_CONFIG.checkpointInset;
 
   return {
     id: `checkpoint-${safeIndex + 1}`,
     index: safeIndex + 1,
-    x,
-    spawnX: x + 34,
-    spawnY: GROUND_TOP - GAME_CONFIG.orbRadius,
+    x: WORLD_CONFIG.corridorCenterX,
+    y,
+    spawnX: WORLD_CONFIG.corridorCenterX,
+    spawnY: y - 34,
     chunkIndex: safeIndex,
     difficultyAfter: Math.min(HAZARD_CONFIG.difficultyCap, safeIndex + 2)
   };
@@ -859,7 +851,7 @@ export function loseLife(state, cause = "hazard") {
   state.animation.bouncePulse = 0;
   state.camera.x = state.orb.x;
   state.camera.y = state.orb.y;
-  refreshWorldForFocus(state, state.orb.x);
+  refreshWorldForFocus(state, state.orb.y);
   updateProgress(state);
   return true;
 }
@@ -867,8 +859,6 @@ export function loseLife(state, cause = "hazard") {
 function simulateOrbFlight(state, dt) {
   const startX = state.orb.x;
   const startY = state.orb.y;
-
-  state.orb.vy += GAME_CONFIG.orbGravity * dt;
 
   const speed = Math.hypot(state.orb.vx, state.orb.vy);
   if (speed > GAME_CONFIG.maxOrbSpeed) {
@@ -880,7 +870,7 @@ function simulateOrbFlight(state, dt) {
   const nextX = startX + state.orb.vx * dt;
   const nextY = startY + state.orb.vy * dt;
 
-  refreshWorldForFocus(state, nextX);
+  refreshWorldForFocus(state, nextY);
   updateDynamicWorld(state);
 
   const surfaceHit = findEarliestSurfaceCollision(
@@ -920,8 +910,9 @@ function simulateOrbFlight(state, dt) {
 
   if (
     state.orb.invulnerability <= 0 &&
-    (state.orb.y > GROUND_TOP + WORLD_CONFIG.worldKillMargin ||
-      state.orb.y < CEILING_BOTTOM - WORLD_CONFIG.worldKillMargin)
+    (state.orb.x < CORRIDOR_LEFT - WORLD_CONFIG.worldKillMargin ||
+      state.orb.x > CORRIDOR_RIGHT + WORLD_CONFIG.worldKillMargin ||
+      state.orb.y > WORLD_CONFIG.starterBottomY + WORLD_CONFIG.worldKillMargin)
   ) {
     loseLife(state, "outOfBounds");
   }
@@ -1055,9 +1046,8 @@ function bounceOrbFromSurface(state, hit) {
   state.animation.bouncePulse = 1;
 
   const speed = Math.hypot(state.orb.vx, state.orb.vy);
-  const canRest = hit.normalY === -1 && state.orb.vy <= 0;
 
-  if (canRest && speed < GAME_CONFIG.restSpeedThreshold) {
+  if (speed < GAME_CONFIG.restSpeedThreshold) {
     state.orb.vx = 0;
     state.orb.vy = 0;
     state.mode = "ready";
@@ -1084,6 +1074,7 @@ function updateDynamicWorld(state) {
   }
 }
 
+
 function updateDrones(state, dt) {
   const orb = state.orb;
 
@@ -1106,24 +1097,24 @@ function updateDrones(state, dt) {
       drone.y += (drone.homeY + Math.cos(phase * 0.8) * 18 - drone.y) * Math.min(1, dt * 1.8);
     }
 
-    const chunkMinX =
+    const chunkBottomY =
       drone.chunkIndex === null
-        ? WORLD_CONFIG.proceduralStartX - 260
-        : WORLD_CONFIG.proceduralStartX +
-          drone.chunkIndex * WORLD_CONFIG.chunkWidth +
-          DRONE_CONFIG.corridorPadding;
-    const chunkMaxX =
+        ? WORLD_CONFIG.starterBottomY
+        : WORLD_CONFIG.proceduralStartY - drone.chunkIndex * WORLD_CONFIG.chunkHeight;
+    const chunkTopY =
       drone.chunkIndex === null
-        ? WORLD_CONFIG.proceduralStartX + 100
-        : WORLD_CONFIG.proceduralStartX +
-          (drone.chunkIndex + 1) * WORLD_CONFIG.chunkWidth -
-          DRONE_CONFIG.corridorPadding;
+        ? WORLD_CONFIG.proceduralStartY
+        : chunkBottomY - WORLD_CONFIG.chunkHeight;
 
-    drone.x = clamp(drone.x, chunkMinX, chunkMaxX);
+    drone.x = clamp(
+      drone.x,
+      CORRIDOR_LEFT + DRONE_CONFIG.corridorPadding,
+      CORRIDOR_RIGHT - DRONE_CONFIG.corridorPadding
+    );
     drone.y = clamp(
       drone.y,
-      CEILING_BOTTOM + DRONE_CONFIG.corridorPadding,
-      GROUND_TOP - DRONE_CONFIG.corridorPadding
+      chunkTopY + DRONE_CONFIG.corridorPadding,
+      chunkBottomY - DRONE_CONFIG.corridorPadding
     );
 
     if (
@@ -1169,11 +1160,16 @@ function advanceProjectiles(state, dt) {
   }
 }
 
+
 function pruneProjectiles(state) {
   state.world.projectiles = state.world.projectiles.filter((projectile) => {
     if (projectile.age >= projectile.lifetime) return false;
-    if (projectile.y < CEILING_BOTTOM - 120 || projectile.y > GROUND_TOP + 120) return false;
-    if (projectile.x < state.orb.x - 1800 || projectile.x > state.orb.x + 2600) return false;
+    if (projectile.x < CORRIDOR_LEFT - 120 || projectile.x > CORRIDOR_RIGHT + 120) {
+      return false;
+    }
+    if (projectile.y < state.orb.y - 2600 || projectile.y > state.orb.y + 1800) {
+      return false;
+    }
     return true;
   });
 
@@ -1185,13 +1181,14 @@ function pruneProjectiles(state) {
   }
 }
 
+
 function updateCheckpointProgress(state) {
   let nextCheckpoint = null;
 
   for (const checkpoint of state.world.checkpoints) {
     if (
       checkpoint.index > state.checkpoint.index &&
-      state.orb.x >= checkpoint.x &&
+      state.orb.y <= checkpoint.y &&
       (!nextCheckpoint || checkpoint.index < nextCheckpoint.index)
     ) {
       nextCheckpoint = checkpoint;
@@ -1202,27 +1199,30 @@ function updateCheckpointProgress(state) {
 
   state.checkpoint.index = nextCheckpoint.index;
   state.checkpoint.x = nextCheckpoint.x;
+  state.checkpoint.y = nextCheckpoint.y;
   state.checkpoint.spawnX = nextCheckpoint.spawnX;
   state.checkpoint.spawnY = nextCheckpoint.spawnY;
   state.progress.difficultyLevel = nextCheckpoint.difficultyAfter;
   state.animation.checkpointPulse = 1;
 }
 
+
 function updateProgress(state) {
-  state.progress.maxProgressX = Math.max(state.progress.maxProgressX, state.orb.x);
+  state.progress.minProgressY = Math.min(state.progress.minProgressY, state.orb.y);
   state.progress.currentMetres = Math.max(
     0,
-    Math.floor((state.orb.x - state.progress.startX) / 10)
+    Math.floor((state.progress.startY - state.orb.y) / 10)
   );
   state.progress.furthestMetres = Math.max(
     state.progress.furthestMetres,
-    Math.floor((state.progress.maxProgressX - state.progress.startX) / 10)
+    Math.floor((state.progress.startY - state.progress.minProgressY) / 10)
   );
 }
 
+
 function updateCamera(state, dt) {
   const cameraBlend = 1 - Math.exp(-GAME_CONFIG.cameraSharpness * dt);
-  state.camera.x += (state.orb.x - state.camera.x) * cameraBlend;
+  state.camera.x += (WORLD_CONFIG.corridorCenterX - state.camera.x) * cameraBlend;
   state.camera.y += (state.orb.y - state.camera.y) * cameraBlend;
 }
 
@@ -1275,14 +1275,15 @@ function difficultyForChunk(chunkIndex) {
   return Math.min(HAZARD_CONFIG.difficultyCap, Math.max(1, chunkIndex + 1));
 }
 
-function getChunkIndexForX(x) {
-  if (x <= WORLD_CONFIG.proceduralStartX) {
+
+function getChunkIndexForY(y) {
+  if (y >= WORLD_CONFIG.proceduralStartY) {
     return 0;
   }
 
   return Math.max(
     0,
-    Math.floor((x - WORLD_CONFIG.proceduralStartX) / WORLD_CONFIG.chunkWidth)
+    Math.floor((WORLD_CONFIG.proceduralStartY - y) / WORLD_CONFIG.chunkHeight)
   );
 }
 
