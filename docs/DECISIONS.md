@@ -91,3 +91,16 @@ The gameplay state owns only the minimal animation descriptors needed across fra
 Grounded aiming keeps the normal presentation. Releasing any aim starts a short throw follow-through. Releasing from airborne aim preserves the airborne body pose until the next relay changes the player's placement context.
 
 Reason: throwing should read as a physical action, and mid-air aiming should feel like hang-time/bullet-time without destabilizing the procedural world, touch controls, spear physics, collision or camera systems.
+
+
+## 2026-09-27 — Prototype 0.5 adds bounded roaming NPC targets and a wider camera
+
+Decision: the traversal camera renders the world at a 0.78 scale while retaining the existing camera focus and touch aiming contract. The zoom factor is centralized in `GAME_CONFIG` so rendering systems share one view scale.
+
+NPCs are owned by `game-core.js`, not by the renderer. The authored opening area has a small fixed NPC set, and each procedural chunk deterministically contributes two more. Only NPCs belonging to the current bounded chunk window remain active, matching the terrain streaming model and preventing endless runs from accumulating unbounded character state.
+
+NPCs alternate between standing and simple ground patrol behavior. Obstacle checks reverse patrol direction before walking through solid world geometry. Spear collision uses the same swept segment approach as terrain collision, compares the earliest NPC and surface contact, and transfers part of the spear momentum to the NPC when the NPC is hit. A thrown NPC is temporarily removed from spear targeting until it lands and recovers.
+
+The run score stores only the integer number of NPC hit events. Resetting the run resets that counter. No unbounded hit-history collection is kept.
+
+Reason: the world should feel more populated and readable at speed while preserving mobile performance, deterministic procedural generation, one authoritative gameplay simulation, and the existing spear-relay control loop.

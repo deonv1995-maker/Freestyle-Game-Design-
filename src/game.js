@@ -1,8 +1,10 @@
 import {
+  GAME_CONFIG,
   beginAim,
   createGameState,
   getAimVector,
   getPlayerHandPosition,
+  getWorldNpcs,
   getWorldSurfaces,
   releaseAim,
   stepGame,
@@ -21,6 +23,7 @@ let lastTime = performance.now();
 let viewportWidth = 1;
 let viewportHeight = 1;
 let pixelRatio = 1;
+let lastHudSnapshot = "";
 
 const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
@@ -42,9 +45,10 @@ function resizeCanvas() {
 }
 
 function worldToScreen(x, y) {
+  const scale = GAME_CONFIG.cameraZoom;
   return {
-    x: x - state.camera.x + viewportWidth * 0.5,
-    y: y - state.camera.y + viewportHeight * 0.53
+    x: (x - state.camera.x) * scale + viewportWidth * 0.5,
+    y: (y - state.camera.y) * scale + viewportHeight * 0.53
   };
 }
 
@@ -82,7 +86,7 @@ function drawParallaxDots() {
 }
 
 function drawWorldGrid() {
-  const spacing = 160;
+  const spacing = 160 * GAME_CONFIG.cameraZoom;
   const center = worldToScreen(0, 0);
   const startX = mod(center.x, spacing) - spacing;
   const startY = mod(center.y, spacing) - spacing;
@@ -116,28 +120,31 @@ function drawWorldGrid() {
 }
 
 function drawWorldSurfaces() {
+  const scale = GAME_CONFIG.cameraZoom;
   ctx.save();
 
   for (const surface of getWorldSurfaces(state)) {
     const p = worldToScreen(surface.x, surface.y);
+    const width = surface.width * scale;
+    const height = surface.height * scale;
 
     if (
       p.x > viewportWidth + 80 ||
-      p.x + surface.width < -80 ||
+      p.x + width < -80 ||
       p.y > viewportHeight + 80 ||
-      p.y + surface.height < -80
+      p.y + height < -80
     ) {
       continue;
     }
 
     if (surface.type === "ground") {
       ctx.fillStyle = "#202a25";
-      ctx.fillRect(p.x, p.y, surface.width, surface.height);
+      ctx.fillRect(p.x, p.y, width, height);
       ctx.fillStyle = "#5f7a58";
-      ctx.fillRect(p.x, p.y, surface.width, 7);
+      ctx.fillRect(p.x, p.y, width, 7 * scale);
       ctx.fillStyle = "rgba(151, 184, 134, 0.42)";
-      for (let x = p.x + 16; x < p.x + surface.width; x += 34) {
-        ctx.fillRect(x, p.y - 4, 2, 6);
+      for (let x = p.x + 16 * scale; x < p.x + width; x += 34 * scale) {
+        ctx.fillRect(x, p.y - 4 * scale, 2 * scale, 6 * scale);
       }
       continue;
     }
@@ -145,8 +152,15 @@ function drawWorldSurfaces() {
     const isPlatform = surface.type === "platform";
     ctx.fillStyle = isPlatform ? "#36465f" : "#493d48";
     ctx.strokeStyle = isPlatform ? "#8499bb" : "#9f7f8a";
-    ctx.lineWidth = 2;
-    roundRect(ctx, p.x, p.y, surface.width, surface.height, isPlatform ? 6 : 4);
+    ctx.lineWidth = Math.max(1, 2 * scale);
+    roundRect(
+      ctx,
+      p.x,
+      p.y,
+      width,
+      height,
+      (isPlatform ? 6 : 4) * scale
+    );
     ctx.fill();
     ctx.stroke();
 
@@ -155,12 +169,77 @@ function drawWorldSurfaces() {
       : "rgba(232, 199, 208, 0.18)";
     ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.moveTo(p.x + 8, p.y + 6);
-    ctx.lineTo(p.x + surface.width - 8, p.y + 6);
+    ctx.moveTo(p.x + 8 * scale, p.y + 6 * scale);
+    ctx.lineTo(p.x + width - 8 * scale, p.y + 6 * scale);
     ctx.stroke();
   }
 
   ctx.restore();
+}
+
+function drawNpcs() {
+  const scale = GAME_CONFIG.cameraZoom;
+
+  for (const npc of getWorldNpcs(state)) {
+    const p = worldToScreen(npc.x, npc.y);
+    if (p.x < -70 || p.x > viewportWidth + 70 || p.y < -90 || p.y > viewportHeight + 80) {
+      continue;
+    }
+
+    const facing = npc.direction < 0 ? -1 : 1;
+    const walking = npc.mode === "walking";
+    const thrown = npc.mode === "thrown";
+    const recovering = npc.mode === "recovering";
+    const stride = walking
+      ? Math.sin(state.animation.clock * (4.2 + npc.speed * 0.035) + npc.x * 0.018)
+      : 0;
+    const armSwing = stride * 7;
+    const legSwing = stride * 9;
+
+    ctx.save();
+    ctx.translate(p.x, p.y);
+    ctx.scale(scale, scale);
+
+    if (thrown) {
+      ctx.translate(0, -24);
+      ctx.rotate(npc.rotation);
+      ctx.translate(0, 24);
+    } else if (recovering) {
+      ctx.rotate(facing * 0.08);
+    }
+
+    ctx.strokeStyle = npc.hitFlash > 0 ? "#ffd56a" : "#f29b72";
+    ctx.fillStyle = npc.hitFlash > 0 ? "#fff0b2" : "#ffd0b8";
+    ctx.lineWidth = 4;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+
+    ctx.beginPath();
+    ctx.arc(0, -48, 8, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.moveTo(0, -40);
+    ctx.lineTo(0, -18);
+
+    ctx.moveTo(0, -35);
+    ctx.lineTo(-facing * 11 - armSwing, -25);
+    ctx.moveTo(0, -35);
+    ctx.lineTo(facing * 11 + armSwing, -25);
+
+    ctx.moveTo(0, -18);
+    ctx.lineTo(-facing * 8 - legSwing, 0);
+    ctx.moveTo(0, -18);
+    ctx.lineTo(facing * 8 + legSwing, 0);
+    ctx.stroke();
+
+    ctx.fillStyle = "rgba(20, 25, 35, 0.72)";
+    ctx.beginPath();
+    ctx.arc(facing * 3, -49, 1.4, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.restore();
+  }
 }
 
 function drawTrail() {
@@ -252,7 +331,7 @@ function drawTeleportPulse() {
 
   const p = worldToScreen(state.player.x, state.player.y - 28);
   const progress = 1 - state.teleportPulse;
-  const radius = 24 + progress * 48;
+  const radius = (24 + progress * 48) * GAME_CONFIG.cameraZoom;
 
   ctx.save();
   ctx.strokeStyle = `rgba(121, 209, 255, ${state.teleportPulse * 0.75})`;
@@ -312,6 +391,7 @@ function drawSlowMotionEffect() {
 
 function drawPlayer() {
   const p = worldToScreen(state.player.x, state.player.y);
+  const scale = GAME_CONFIG.cameraZoom;
   const isAiming = state.mode === "aiming";
   const isAirAim = state.animation.airborneAim;
   const isAirborne = state.animation.playerAirborne;
@@ -398,9 +478,11 @@ function drawPlayer() {
   }
 
   ctx.save();
+  ctx.translate(p.x, p.y);
+  ctx.scale(scale, scale);
   ctx.translate(
-    p.x - direction.x * recoil,
-    p.y + floatOffset - direction.y * recoil * 0.35
+    -direction.x * recoil,
+    floatOffset - direction.y * recoil * 0.35
   );
 
   if (followThrough > 0) {
@@ -457,6 +539,7 @@ function drawSpear() {
 
   ctx.save();
   ctx.translate(p.x, p.y);
+  ctx.scale(GAME_CONFIG.cameraZoom, GAME_CONFIG.cameraZoom);
   ctx.rotate(state.spear.angle);
 
   ctx.strokeStyle = "#e8d5a1";
@@ -492,6 +575,7 @@ function drawSpear() {
 function render() {
   drawBackground();
   drawWorldSurfaces();
+  drawNpcs();
   drawTrail();
   drawSlowMotionEffect();
   drawAimGuide();
@@ -501,31 +585,61 @@ function render() {
 }
 
 function updateHud() {
+  const progressMetres = Math.max(0, Math.round(state.world.maxProgressX / 10));
+  const snapshot = [
+    state.mode,
+    state.throwCount,
+    state.score.npcHits,
+    progressMetres,
+    state.animation.airborneAim ? 1 : 0
+  ].join("|");
+
+  if (snapshot === lastHudSnapshot) return;
+  lastHudSnapshot = snapshot;
+
   if (state.mode === "flying") {
-    statusNode.textContent = `SPEAR IN FLIGHT · THROW ${state.throwCount} · ${Math.max(0, Math.round(state.world.maxProgressX / 10))}m`;
-    hintNode.textContent = "Press and hold to jump to the spear now, then slide to aim the next throw.";
+    statusNode.textContent =
+      "SPEAR IN FLIGHT · THROW " +
+      state.throwCount +
+      " · HITS " +
+      state.score.npcHits +
+      " · " +
+      progressMetres +
+      "m";
+    hintNode.textContent =
+      "Press and hold to jump to the spear now, then slide to aim the next throw.";
     return;
   }
 
   if (state.mode === "stuck") {
-    statusNode.textContent = `SPEAR PLANTED · THROW ${state.throwCount} · ${Math.max(0, Math.round(state.world.maxProgressX / 10))}m`;
-    hintNode.textContent = "Hold the screen to relay onto this surface, slide to aim, then release.";
+    statusNode.textContent =
+      "SPEAR PLANTED · THROW " +
+      state.throwCount +
+      " · HITS " +
+      state.score.npcHits +
+      " · " +
+      progressMetres +
+      "m";
+    hintNode.textContent =
+      "Hold the screen to relay onto this surface, slide to aim, then release.";
     return;
   }
 
   if (state.mode === "aiming") {
     if (state.animation.airborneAim) {
-      statusNode.textContent = "AIR AIM · SLOW MOTION";
-      hintNode.textContent = "Hang time is slowed for aiming. Slide to line up the throw, then release.";
+      statusNode.textContent = "AIR AIM · HITS " + state.score.npcHits + " · SLOW MOTION";
+      hintNode.textContent =
+        "Hang time is slowed for aiming. Slide to line up the throw, then release.";
     } else {
-      statusNode.textContent = "AIMING";
+      statusNode.textContent = "AIMING · HITS " + state.score.npcHits;
       hintNode.textContent = "Slide in the throw direction. Release your finger to launch.";
     }
     return;
   }
 
-  statusNode.textContent = "READY";
-  hintNode.textContent = "Move forward and the course will keep generating ahead of you.";
+  statusNode.textContent = "READY · HITS " + state.score.npcHits;
+  hintNode.textContent =
+    "Move forward, hit roaming NPCs with the spear, and the course will keep generating ahead.";
 }
 
 function recordTrail() {
@@ -546,6 +660,7 @@ function frame(now) {
 
   stepGame(state, reduceMotion ? Math.min(dt, 1 / 30) : dt);
   recordTrail();
+  updateHud();
   render();
   requestAnimationFrame(frame);
 }
@@ -588,6 +703,7 @@ canvas.addEventListener("pointercancel", finishAim);
 resetButton.addEventListener("click", () => {
   state = createGameState();
   trail = [];
+  lastHudSnapshot = "";
   updateHud();
 });
 
