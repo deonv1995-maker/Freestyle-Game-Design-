@@ -399,6 +399,7 @@ export function stepGame(state, deltaSeconds) {
   if (state.mode === "orb" || state.mode === "airAiming") {
     simulateOrbFlight(state, gameplayDt);
   } else {
+    resolveStationarySurfaceContacts(state);
     resolveStationaryLethalContacts(state);
   }
 
@@ -725,6 +726,22 @@ export function findEarliestSurfaceCollision(
   endY,
   radius = 0
 ) {
+  const overlapHit = findShallowestSurfacePenetration(
+    state,
+    startX,
+    startY,
+    radius
+  );
+
+  if (overlapHit) {
+    return {
+      t: 0,
+      x: startX,
+      y: startY,
+      ...overlapHit
+    };
+  }
+
   let earliest = null;
 
   for (const surface of state.world.surfaces) {
@@ -1033,8 +1050,7 @@ function bounceOrbFromSurface(state, hit) {
     state.orb.vx *= GAME_CONFIG.bounceTangentialDamping;
   }
 
-  state.orb.x += hit.normalX * GAME_CONFIG.bounceSeparation;
-  state.orb.y += hit.normalY * GAME_CONFIG.bounceSeparation;
+  separateOrbFromSurface(state, hit);
   state.orb.lastBounce = {
     surfaceId: hit.surface.id,
     normalX: hit.normalX,
@@ -1048,6 +1064,36 @@ function bounceOrbFromSurface(state, hit) {
     state.orb.vx = 0;
     state.orb.vy = 0;
     state.mode = "ready";
+  }
+}
+
+function separateOrbFromSurface(state, hit) {
+  const penetrationDepth = Math.max(0, hit.penetrationDepth ?? 0);
+  const correction = penetrationDepth + GAME_CONFIG.bounceSeparation;
+
+  state.orb.x += hit.normalX * correction;
+  state.orb.y += hit.normalY * correction;
+}
+
+function resolveStationarySurfaceContacts(state) {
+  // A moving platform can advance into a resting/aiming orb between frames.
+  // Resolve any overlap without cancelling the player's current input state.
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    const hit = findShallowestSurfacePenetration(
+      state,
+      state.orb.x,
+      state.orb.y,
+      GAME_CONFIG.orbRadius
+    );
+
+    if (!hit) return;
+
+    separateOrbFromSurface(state, hit);
+    state.orb.lastBounce = {
+      surfaceId: hit.surface.id,
+      normalX: hit.normalX,
+      normalY: hit.normalY
+    };
   }
 }
 
@@ -1381,6 +1427,66 @@ function expandedRect(rect, radius) {
     width: rect.width + radius * 2,
     height: rect.height + radius * 2
   };
+}
+
+function findShallowestSurfacePenetration(state, x, y, radius = 0) {
+  let shallowest = null;
+
+  for (const surface of state.world.surfaces) {
+    const penetration = pointRectPenetration(
+      x,
+      y,
+      expandedRect(surface, radius)
+    );
+
+    if (!penetration) continue;
+
+    if (
+      !shallowest ||
+      penetration.depth < shallowest.penetrationDepth
+    ) {
+      shallowest = {
+        surface,
+        normalX: penetration.normalX,
+        normalY: penetration.normalY,
+        penetrationDepth: penetration.depth
+      };
+    }
+  }
+
+  return shallowest;
+}
+
+function pointRectPenetration(x, y, rect) {
+  const epsilon = 1e-7;
+  const right = rect.x + rect.width;
+  const bottom = rect.y + rect.height;
+
+  if (
+    x <= rect.x + epsilon ||
+    x >= right - epsilon ||
+    y <= rect.y + epsilon ||
+    y >= bottom - epsilon
+  ) {
+    return null;
+  }
+
+  const candidates = [
+    { depth: x - rect.x, normalX: -1, normalY: 0 },
+    { depth: right - x, normalX: 1, normalY: 0 },
+    { depth: y - rect.y, normalX: 0, normalY: -1 },
+    { depth: bottom - y, normalX: 0, normalY: 1 }
+  ];
+
+  let shallowest = candidates[0];
+
+  for (let index = 1; index < candidates.length; index += 1) {
+    if (candidates[index].depth < shallowest.depth) {
+      shallowest = candidates[index];
+    }
+  }
+
+  return shallowest;
 }
 
 function seededUnit(chunkIndex, salt) {

@@ -267,3 +267,12 @@ Decision: application onboarding is owned by the browser/UI layer rather than th
 Decision: the simulation does not call `stepGame` while the menu or tutorial is visible, and pointer input is rejected outside the playing phase. Starting a run creates a fresh game state and resets presentation-only trail/respawn timing without changing persistent best-distance storage.
 
 Reason: players need a clear entry point and enough instruction to understand the control loop without allowing hazards, timers or procedural systems to advance behind onboarding UI. Keeping this state outside `game-core.js` preserves the existing deterministic gameplay architecture and prevents presentation flow from becoming a competing source of gameplay truth.
+
+
+## 2026-09-28 — Solid-surface overlap recovery prevents platform trapping
+
+Decision: orb-versus-solid collision now treats a frame that begins inside an orb-radius-expanded surface as an overlap that must be depenetrated before normal swept collision continues. The correction uses the shallowest escape normal and the full penetration depth plus the existing bounce separation, rather than applying only the small post-impact separation used for ordinary contacts.
+
+Decision: resting and actively aiming orbs also resolve solid overlaps after moving surfaces update, without cancelling the current aim state. Moving-platform motion therefore cannot leave the orb embedded merely because the orb was stationary when the platform advanced into it.
+
+Reason: moving platforms can change position between simulation frames. A sweep that assumes the orb always starts outside geometry can otherwise produce repeated time-zero contacts and leave the orb visually and mechanically trapped inside a platform. Explicit depenetration fixes that lifecycle boundary while keeping collision ownership in `game-core.js` and preserving the existing deterministic surface definitions.
