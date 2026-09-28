@@ -651,14 +651,20 @@ test("drones start later, stay spaced out and scale gradually", () => {
 
 test("drones give a full warning window before firing after acquiring the orb", () => {
   const state = createGameState();
-  const drone = getWorldDrones(state)[0];
+  const drone = getWorldDrones(state).find(
+    (candidate) =>
+      candidate.id === `chunk-${DRONE_CONFIG.firstChunk}-drone-0`
+  );
+  assert.ok(drone);
 
   state.mode = "ready";
   state.orb.invulnerability = 5;
 
+  // Keep the orb in chunk 0 while moving just outside/inside acquisition range.
+  // This isolates the warning timer from a streamed-world window change.
   drone.cooldown = 0.05;
   state.orb.x = drone.x;
-  state.orb.y = drone.y + DRONE_CONFIG.acquireRange + 120;
+  state.orb.y = drone.y + DRONE_CONFIG.acquireRange + 40;
 
   stepGame(state, 0.05);
 
@@ -669,7 +675,7 @@ test("drones give a full warning window before firing after acquiring the orb", 
     DRONE_CONFIG.preFireWarningDuration
   );
 
-  state.orb.y = drone.y + 180;
+  state.orb.y = drone.y + DRONE_CONFIG.acquireRange - 60;
 
   stepGame(state, 0.05);
 
@@ -692,12 +698,16 @@ test("drones give a full warning window before firing after acquiring the orb", 
 
 test("nearby drones eventually fire targeted projectiles", () => {
   const state = createGameState();
-  const drone = getWorldDrones(state)[0];
+  const drone = getWorldDrones(state).find(
+    (candidate) =>
+      candidate.id === `chunk-${DRONE_CONFIG.firstChunk}-drone-0`
+  );
+  assert.ok(drone);
 
   state.mode = "ready";
   state.orb.x = drone.x;
-  state.orb.y = drone.y + 180;
-  state.orb.invulnerability = 3;
+  state.orb.y = drone.y + DRONE_CONFIG.acquireRange - 80;
+  state.orb.invulnerability = 5;
 
   for (let i = 0; i < 80 && getWorldProjectiles(state).length === 0; i += 1) {
     stepGame(state, 0.05);
@@ -708,21 +718,24 @@ test("nearby drones eventually fire targeted projectiles", () => {
 
 test("orb contact destroys a drone without costing a life", () => {
   const state = createGameState();
-  const drone = getWorldDrones(state).find(
-    (candidate) => candidate.id === "chunk-1-drone-0"
+  const firstEncounterId = `chunk-${DRONE_CONFIG.firstChunk}-drone-0`;
+  const initialDrone = getWorldDrones(state).find(
+    (candidate) => candidate.id === firstEncounterId
   );
+  assert.ok(initialDrone);
+
+  // Move the streamed focus to the first delayed drone encounter before
+  // capturing the object under test so stepGame does not reconcile it away.
+  refreshWorldForFocus(state, initialDrone.y);
+  const drone = getWorldDrones(state).find(
+    (candidate) => candidate.id === firstEncounterId
+  );
+  assert.ok(drone);
   const startingLives = state.lives;
 
-  // Keep the contact path in the starter area's open center so the
-  // drone-contact rule is isolated from generated platforms and hazards.
-  drone.x = 0;
-  drone.y = 100;
-  drone.homeX = drone.x;
-  drone.homeY = drone.y;
-
   state.mode = "orb";
-  state.orb.x = -62;
-  state.orb.y = 100;
+  state.orb.x = drone.x - 62;
+  state.orb.y = drone.y;
   state.orb.vx = 900;
   state.orb.vy = 0;
   state.orb.invulnerability = 2;
