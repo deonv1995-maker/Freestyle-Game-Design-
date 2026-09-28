@@ -45,7 +45,7 @@ canvas { -webkit-tap-highlight-color: transparent; }
   left: max(14px, env(safe-area-inset-left));
   right: max(14px, env(safe-area-inset-right));
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 12px;
   pointer-events: none;
@@ -57,27 +57,161 @@ canvas { -webkit-tap-highlight-color: transparent; }
   visibility: hidden;
 }
 
-.hud-copy {
-  display: grid;
-  gap: 3px;
-  max-width: min(82vw, 620px);
-  padding: 10px 12px;
-  border: 1px solid rgb(255 255 255 / 12%);
-  border-radius: 12px;
-  background: rgb(8 13 25 / 68%);
-  backdrop-filter: blur(8px);
+.life-orbs {
+  --life-orb-size: clamp(20px, 5.5vw, 28px);
+  display: flex;
+  align-items: center;
+  gap: clamp(3px, 1vw, 7px);
+  min-height: 44px;
 }
 
-#status {
-  font-size: 12px;
-  letter-spacing: 0.12em;
-  color: #ffd56a;
+.life-orb {
+  position: relative;
+  width: var(--life-orb-size);
+  height: var(--life-orb-size);
+  flex: 0 0 var(--life-orb-size);
+  border-radius: 50%;
+  filter: drop-shadow(0 0 7px rgb(72 190 255 / 88%));
+  animation: life-orb-pulse 1.05s ease-in-out infinite alternate;
+  transform-origin: center;
+  transition: opacity 120ms ease, visibility 120ms ease, transform 120ms ease;
 }
 
-#hint {
-  font-size: 13px;
-  line-height: 1.35;
-  color: rgb(246 247 251 / 82%);
+.life-orb::before {
+  content: "";
+  position: absolute;
+  inset: -34%;
+  border-radius: 50%;
+  background:
+    radial-gradient(
+      circle,
+      rgb(236 251 255 / 95%) 0 9%,
+      rgb(126 219 255 / 82%) 18%,
+      rgb(48 153 255 / 48%) 36%,
+      rgb(34 115 255 / 0%) 70%
+    );
+}
+
+.life-orb::after {
+  content: "";
+  position: absolute;
+  inset: -30%;
+  border-radius: 50%;
+  background:
+    repeating-conic-gradient(
+      from 8deg,
+      rgb(207 246 255 / 0%) 0deg 24deg,
+      rgb(207 246 255 / 88%) 27deg 30deg,
+      rgb(126 219 255 / 18%) 34deg 43deg,
+      rgb(207 246 255 / 0%) 48deg 60deg
+    );
+  -webkit-mask: radial-gradient(circle, transparent 0 38%, #000 42% 59%, transparent 64%);
+  mask: radial-gradient(circle, transparent 0 38%, #000 42% 59%, transparent 64%);
+  animation: life-orb-spin 2.2s linear infinite;
+}
+
+.life-orb-core {
+  position: absolute;
+  inset: 22%;
+  z-index: 1;
+  border-radius: 50%;
+  background:
+    radial-gradient(
+      circle at 38% 32%,
+      #f5fdff 0 12%,
+      #bcefff 30%,
+      #7edbff 52%,
+      #3099ff 78%,
+      #1d6fda 100%
+    );
+  box-shadow:
+    0 0 5px rgb(236 251 255 / 95%),
+    0 0 12px rgb(72 190 255 / 82%);
+}
+
+.life-orb-shards {
+  position: absolute;
+  inset: -70%;
+  z-index: 2;
+  border-radius: 50%;
+  opacity: 0;
+  background:
+    repeating-conic-gradient(
+      from 0deg,
+      transparent 0deg 20deg,
+      rgb(236 251 255 / 96%) 21deg 24deg,
+      transparent 25deg 43deg,
+      rgb(72 190 255 / 90%) 44deg 47deg,
+      transparent 48deg 60deg
+    );
+  -webkit-mask: radial-gradient(circle, transparent 0 28%, #000 33% 48%, transparent 53%);
+  mask: radial-gradient(circle, transparent 0 28%, #000 33% 48%, transparent 53%);
+  pointer-events: none;
+}
+
+.life-orb.is-exploding {
+  animation: life-orb-explode 560ms cubic-bezier(0.2, 0.72, 0.25, 1) forwards;
+}
+
+.life-orb.is-exploding::before {
+  animation: life-orb-flash 560ms ease-out forwards;
+}
+
+.life-orb.is-exploding::after {
+  animation: life-orb-ring-burst 560ms ease-out forwards;
+}
+
+.life-orb.is-exploding .life-orb-core {
+  animation: life-orb-core-burst 560ms ease-out forwards;
+}
+
+.life-orb.is-exploding .life-orb-shards {
+  animation: life-orb-shard-burst 560ms ease-out forwards;
+}
+
+.life-orb.is-spent {
+  opacity: 0;
+  visibility: hidden;
+  transform: scale(0.28);
+  animation: none;
+}
+
+@keyframes life-orb-pulse {
+  from { transform: scale(0.94); }
+  to { transform: scale(1.06); }
+}
+
+@keyframes life-orb-spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes life-orb-explode {
+  0% { opacity: 1; transform: scale(1); filter: drop-shadow(0 0 7px rgb(72 190 255 / 88%)); }
+  28% { opacity: 1; transform: scale(1.28); filter: drop-shadow(0 0 15px rgb(207 246 255 / 100%)); }
+  100% { opacity: 0; transform: scale(2.35); filter: drop-shadow(0 0 2px rgb(72 190 255 / 0%)); }
+}
+
+@keyframes life-orb-flash {
+  0% { opacity: 0.9; transform: scale(1); }
+  36% { opacity: 1; transform: scale(1.5); }
+  100% { opacity: 0; transform: scale(3); }
+}
+
+@keyframes life-orb-ring-burst {
+  0% { opacity: 0.95; transform: rotate(0deg) scale(1); }
+  100% { opacity: 0; transform: rotate(120deg) scale(2.7); }
+}
+
+@keyframes life-orb-core-burst {
+  0% { opacity: 1; transform: scale(1); }
+  32% { opacity: 1; transform: scale(1.45); }
+  100% { opacity: 0; transform: scale(0.15); }
+}
+
+@keyframes life-orb-shard-burst {
+  0% { opacity: 0; transform: scale(0.4) rotate(0deg); }
+  18% { opacity: 1; }
+  100% { opacity: 0; transform: scale(2.6) rotate(34deg); }
 }
 
 #resetButton {
@@ -109,12 +243,28 @@ canvas { -webkit-tap-highlight-color: transparent; }
   pointer-events: none;
 }
 
-@media (max-width: 480px) {
-  .hud-copy { max-width: calc(100vw - 98px); }
-  #hint { font-size: 12px; }
+@media (max-width: 360px) {
+  .hud {
+    gap: 8px;
+  }
+
+  #resetButton {
+    min-width: 58px;
+    padding-inline: 11px;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .life-orb,
+  .life-orb::after,
+  .life-orb.is-exploding,
+  .life-orb.is-exploding::before,
+  .life-orb.is-exploding::after,
+  .life-orb.is-exploding .life-orb-core,
+  .life-orb.is-exploding .life-orb-shards {
+    animation: none;
+  }
+
   #resetButton:active { transform: none; }
 }
 
