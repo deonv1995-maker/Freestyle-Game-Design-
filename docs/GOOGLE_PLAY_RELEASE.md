@@ -44,8 +44,8 @@ Before production submission:
 5. Complete Data safety accurately. The current build has no accounts, ads, analytics SDKs, internet permission, cloud saves, location, contacts, camera, microphone, or external tracking.
 6. Declare ads as **No** unless an advertising system is added later.
 7. Complete app access, target audience, content rating, and the remaining App content declarations.
-8. Prepare final store listing assets from the release build: 512×512 Play icon, 1024×500 feature graphic, and phone screenshots that show real gameplay.
-9. Upload first to Internal testing, install the Play-delivered build on a physical phone, and review the automated pre-launch report before promoting the release.
+8. Use `docs/GOOGLE_PLAY_STORE_LISTING.md` for the release copy and asset brief, then prepare the final 512×512 Play icon, 1024×500 feature graphic, and phone screenshots from the release build.
+9. Upload first to Internal testing, install the Play-delivered build on a physical phone, and review the automated pre-launch report before promoting the release. If this is a personal developer account created after 13 November 2023, check whether the current 12-testers-for-14-days closed-test requirement applies before production access.
 10. Do not move to production while there is a known gameplay blocker, crash, startup failure, or platform-collision trap.
 
 ## Physical-device release gate
