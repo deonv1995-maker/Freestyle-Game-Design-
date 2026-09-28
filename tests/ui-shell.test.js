@@ -25,3 +25,17 @@ test("start screen and tutorial gate the playable run", async () => {
   assert.match(css, /\.screen-layer\.is-hidden/);
   assert.match(css, /\.tutorial-step/);
 });
+
+
+test("release shell exposes the bundled privacy policy", async () => {
+  const [html, privacy, build] = await Promise.all([
+    readFile(new URL("../index.html", import.meta.url), "utf8"),
+    readFile(new URL("../privacy.html", import.meta.url), "utf8"),
+    readFile(new URL("../scripts/build.mjs", import.meta.url), "utf8")
+  ]);
+
+  assert.match(html, /href=["']\.\/privacy\.html["']/);
+  assert.match(privacy, /<h1>Privacy Policy<\/h1>/);
+  assert.match(privacy, /does not collect, transmit, sell, or\s+share personal information/i);
+  assert.match(build, /privacy\.html/);
+});
