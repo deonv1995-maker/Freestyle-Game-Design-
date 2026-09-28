@@ -669,7 +669,9 @@ test("drones give a full warning window before firing after acquiring the orb", 
     DRONE_CONFIG.preFireWarningDuration
   );
 
-  state.orb.y = drone.y + 180;
+  // Stay within the current streamed focus window while moving into range so
+  // this test keeps asserting against the authoritative drone instance.
+  state.orb.y = drone.y + 600;
 
   stepGame(state, 0.05);
 
@@ -696,7 +698,9 @@ test("nearby drones eventually fire targeted projectiles", () => {
 
   state.mode = "ready";
   state.orb.x = drone.x;
-  state.orb.y = drone.y + 180;
+  // Give the slower early drone enough separation to complete its telegraph
+  // and fire before pursuit contact destroys it.
+  state.orb.y = drone.y + 600;
   state.orb.invulnerability = 3;
 
   for (let i = 0; i < 80 && getWorldProjectiles(state).length === 0; i += 1) {
@@ -708,22 +712,27 @@ test("nearby drones eventually fire targeted projectiles", () => {
 
 test("orb contact destroys a drone without costing a life", () => {
   const state = createGameState();
+
+  // Stream the first real drone encounter before taking the instance used by
+  // the collision assertion. Drones now begin later than the starter area.
+  assert.equal(
+    refreshWorldForFocus(
+      state,
+      WORLD_CONFIG.proceduralStartY - WORLD_CONFIG.chunkHeight - 20
+    ),
+    true
+  );
+
   const drone = getWorldDrones(state).find(
     (candidate) => candidate.id === "chunk-1-drone-0"
   );
   const startingLives = state.lives;
-
-  // Keep the contact path in the starter area's open center so the
-  // drone-contact rule is isolated from generated platforms and hazards.
-  drone.x = 0;
-  drone.y = 100;
-  drone.homeX = drone.x;
-  drone.homeY = drone.y;
+  const approachFromCenter = drone.x >= 0 ? -1 : 1;
 
   state.mode = "orb";
-  state.orb.x = -62;
-  state.orb.y = 100;
-  state.orb.vx = 900;
+  state.orb.x = drone.x + approachFromCenter * 62;
+  state.orb.y = drone.y;
+  state.orb.vx = -approachFromCenter * 900;
   state.orb.vy = 0;
   state.orb.invulnerability = 2;
 
@@ -747,7 +756,7 @@ test("orb contact destroys a drone without costing a life", () => {
   assert.equal(
     refreshWorldForFocus(
       state,
-      WORLD_CONFIG.proceduralStartY - WORLD_CONFIG.chunkHeight - 20
+      WORLD_CONFIG.proceduralStartY - WORLD_CONFIG.chunkHeight * 2 - 20
     ),
     true
   );
