@@ -19,8 +19,7 @@ import {
 
 const canvas = document.querySelector("#gameCanvas");
 const ctx = canvas.getContext("2d", { alpha: false });
-const statusNode = document.querySelector("#status");
-const hintNode = document.querySelector("#hint");
+const lifeOrbsNode = document.querySelector("#lifeOrbs");
 const resetButton = document.querySelector("#resetButton");
 const hudNode = document.querySelector(".hud");
 const startScreen = document.querySelector("#startScreen");
@@ -41,9 +40,10 @@ let lastTime = performance.now();
 let viewportWidth = 1;
 let viewportHeight = 1;
 let pixelRatio = 1;
-let lastHudSnapshot = "";
 let lastRespawnSerial = state.run.respawnSerial;
+let lastRestartCount = state.run.restartCount;
 let bestDistanceMetres = loadBestDistance();
+let lifeOrbNodes = [];
 let appPhase = APP_PHASE.MENU;
 
 const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -63,8 +63,7 @@ function setAppPhase(nextPhase) {
 
   if (showHud) {
     lastTime = performance.now();
-    lastHudSnapshot = "";
-    updateHud();
+    syncLifeHudLabel(state.lives);
   }
 }
 
@@ -72,8 +71,101 @@ function resetRunState() {
   state = createGameState();
   trail = [];
   lastRespawnSerial = state.run.respawnSerial;
-  lastHudSnapshot = "";
+  lastRestartCount = state.run.restartCount;
   lastTime = performance.now();
+  resetLifeHud();
+}
+
+function createLifeHud() {
+  const orbCount = GAME_CONFIG.startingLives;
+  const fragment = document.createDocumentFragment();
+
+  lifeOrbNodes = Array.from({ length: orbCount }, (_, index) => {
+    const orb = document.createElement("span");
+    orb.className = "life-orb";
+    orb.dataset.lifeIndex = String(index);
+    orb.setAttribute("aria-hidden", "true");
+
+    const core = document.createElement("span");
+    core.className = "life-orb-core";
+
+    const shards = document.createElement("span");
+    shards.className = "life-orb-shards";
+
+    orb.append(core, shards);
+    orb.addEventListener("animationend", handleLifeOrbAnimationEnd);
+    fragment.append(orb);
+    return orb;
+  });
+
+  lifeOrbsNode.replaceChildren(fragment);
+  resetLifeHud();
+}
+
+function resetLifeHud() {
+  for (const orb of lifeOrbNodes) {
+    orb.classList.remove("is-exploding", "is-spent");
+    delete orb.dataset.restartAfterExplosion;
+  }
+
+  syncLifeHudLabel(state.lives);
+}
+
+function syncLifeHudLabel(lives) {
+  const noun = lives === 1 ? "life" : "lives";
+  lifeOrbsNode.setAttribute("aria-label", `${lives} ${noun} remaining`);
+}
+
+function triggerLifeLoss(runRestarted) {
+  if (lifeOrbNodes.length === 0) return;
+
+  const lostIndex = runRestarted
+    ? 0
+    : Math.max(0, Math.min(lifeOrbNodes.length - 1, state.lives));
+  const orb = lifeOrbNodes[lostIndex];
+
+  orb.classList.remove("is-spent", "is-exploding");
+  orb.dataset.restartAfterExplosion = runRestarted ? "true" : "false";
+
+  if (runRestarted) {
+    lifeOrbsNode.setAttribute("aria-label", "No lives remaining. Run restarting.");
+  } else {
+    syncLifeHudLabel(state.lives);
+  }
+
+  if (reduceMotion) {
+    finishLifeOrbExplosion(orb);
+    return;
+  }
+
+  // Restarting the CSS animation explicitly makes every life loss readable even
+  // if the same DOM node was recently reused by a manual reset.
+  void orb.offsetWidth;
+  orb.classList.add("is-exploding");
+}
+
+function handleLifeOrbAnimationEnd(event) {
+  if (
+    event.target !== event.currentTarget ||
+    event.animationName !== "life-orb-explode"
+  ) {
+    return;
+  }
+
+  finishLifeOrbExplosion(event.currentTarget);
+}
+
+function finishLifeOrbExplosion(orb) {
+  const restartAfterExplosion = orb.dataset.restartAfterExplosion === "true";
+  orb.classList.remove("is-exploding");
+  delete orb.dataset.restartAfterExplosion;
+
+  if (restartAfterExplosion) {
+    resetLifeHud();
+    return;
+  }
+
+  orb.classList.add("is-spent");
 }
 
 function resizeCanvas() {
@@ -792,71 +884,6 @@ function render() {
   drawEventPulse();
 }
 
-function updateHud() {
-  const snapshot = [
-    state.mode,
-    state.lives,
-    state.burstCount,
-    state.progress.currentMetres,
-    state.progress.furthestMetres,
-    bestDistanceMetres,
-    state.checkpoint.index,
-    state.progress.difficultyLevel,
-    Math.round(state.launch.power * 100),
-    Math.round(state.animation.deathPulse * 10),
-    Math.round(state.animation.runResetPulse * 10)
-  ].join("|");
-
-  if (snapshot === lastHudSnapshot) return;
-  lastHudSnapshot = snapshot;
-
-  const runStats =
-    `LIVES ${state.lives} · ${state.progress.currentMetres}m · ` +
-    `RECORD ${bestDistanceMetres}m · CP ${state.checkpoint.index} · ` +
-    `LEVEL ${state.progress.difficultyLevel}`;
-
-  if (state.animation.runResetPulse > 0.35) {
-    statusNode.textContent = `RUN RESET · ${runStats}`;
-    hintNode.textContent =
-      "All seven lives were used. The run restarted automatically from the beginning.";
-    return;
-  }
-
-  if (state.animation.deathPulse > 0.4) {
-    statusNode.textContent = `RESPAWNED · ${runStats}`;
-    hintNode.textContent =
-      "Hazard hit. You respawned at your latest checkpoint with brief protection.";
-    return;
-  }
-
-  if (state.mode === "aiming") {
-    statusNode.textContent =
-      `SLOW MOTION ${Math.round(GAME_CONFIG.touchTimeScale * 100)}% · AIMING · POWER ${Math.round(state.launch.power * 100)}% · ${runStats}`;
-    hintNode.textContent =
-      "Time slows as soon as you touch. Drag in the direction you want the orb to travel, then release.";
-    return;
-  }
-
-  if (state.mode === "airAiming") {
-    statusNode.textContent =
-      `SLOW MOTION ${Math.round(GAME_CONFIG.touchTimeScale * 100)}% · REDIRECT · POWER ${Math.round(state.launch.power * 100)}% · ${runStats}`;
-    hintNode.textContent =
-      "Time stays slowed while you hold the screen. Drag a new direction and release to redirect.";
-    return;
-  }
-
-  if (state.mode === "orb") {
-    statusNode.textContent = `ENERGY FORM · ${runStats}`;
-    hintNode.textContent =
-      "Zero gravity: every touch slows time—read laser flicker and drone charge rings before committing.";
-    return;
-  }
-
-  statusNode.textContent = `ORB READY · ${runStats}`;
-  hintNode.textContent =
-    "Zero gravity. Drag upward to launch through the side-wall corridor; momentum changes only through redirects and impacts.";
-}
-
 function recordTrail() {
   if (state.mode !== "orb" && state.mode !== "airAiming") return;
 
@@ -872,7 +899,6 @@ function updateRecord() {
 
   bestDistanceMetres = state.progress.furthestMetres;
   saveBestDistance(bestDistanceMetres);
-  lastHudSnapshot = "";
 }
 
 function frame(now) {
@@ -885,7 +911,10 @@ function frame(now) {
     stepGame(state, reduceMotion ? Math.min(dt, 1 / 30) : dt);
 
     if (state.run.respawnSerial !== lastRespawnSerial) {
+      const runRestarted = state.run.restartCount !== lastRestartCount;
+      triggerLifeLoss(runRestarted);
       lastRespawnSerial = state.run.respawnSerial;
+      lastRestartCount = state.run.restartCount;
       trail = [];
     }
 
@@ -895,8 +924,6 @@ function frame(now) {
     if (state.mode === "ready" && trail.length > 0) {
       trail.shift();
     }
-
-    updateHud();
   }
 
   render();
@@ -920,7 +947,6 @@ canvas.addEventListener("pointerdown", (event) => {
 
   if (beginAim(state, point.x, point.y, event.pointerId)) {
     canvas.setPointerCapture?.(event.pointerId);
-    updateHud();
   }
 });
 
@@ -940,7 +966,6 @@ canvas.addEventListener("pointerup", (event) => {
     trail = [{ x: state.orb.x, y: state.orb.y }];
   }
   canvas.releasePointerCapture?.(event.pointerId);
-  updateHud();
 });
 
 canvas.addEventListener("pointercancel", (event) => {
@@ -948,7 +973,6 @@ canvas.addEventListener("pointercancel", (event) => {
 
   cancelAim(state, event.pointerId);
   canvas.releasePointerCapture?.(event.pointerId);
-  updateHud();
 });
 
 playButton.addEventListener("click", () => {
@@ -962,7 +986,6 @@ startRunButton.addEventListener("click", () => {
 
 resetButton.addEventListener("click", () => {
   resetRunState();
-  updateHud();
 });
 
 window.addEventListener("resize", resizeCanvas);
@@ -1000,6 +1023,6 @@ function mod(value, divisor) {
 }
 
 resizeCanvas();
-updateHud();
+createLifeHud();
 setAppPhase(APP_PHASE.MENU);
 requestAnimationFrame(frame);
