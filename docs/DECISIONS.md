@@ -249,3 +249,13 @@ Reason: the visual indicator must be mechanically trustworthy. The player should
 Decision: the shared gameplay slow-motion scale used while any gameplay touch is held is increased from `0.2` to `0.4`. This means the world now advances at 40% of normal speed during aiming/redirection instead of 20%, reducing the strength of the slow-motion effect by half while preserving the same single authoritative gameplay clock.
 
 Reason: touch aiming should still create a planning window, but the previous slowdown was too strong. Keeping the change in `GAME_CONFIG.touchTimeScale` preserves synchronization across orb motion, lasers, drone warnings, projectiles, effects, and timers.
+
+## 2026-09-28 — Drone encounters start later and scale by encounter
+
+Decision: the authored starter drone is removed. Procedural drones begin at chunk 1, after the first checkpoint, and drone encounter chunks are separated by one full drone-free chunk using `DRONE_CONFIG.encounterChunkSpacing = 2`.
+
+Decision: drone difficulty is no longer derived directly from every world chunk. It advances once per actual drone encounter and has its own cap in `DRONE_CONFIG`, so speed, fire interval and projectile-speed scaling take roughly twice as much vertical progression to reach the same values. Drone density now caps at two per encounter, with the second drone introduced only after five difficulty increases.
+
+Decision: multi-drone encounters use centralized vertical inset and jitter values so two drones are laid out across the safe height of the chunk rather than compressed into the middle.
+
+Reason: drones should enter as a later pressure layer, remain readable as distinct encounters, and build difficulty gradually without competing with the laser timing challenge too early or clustering several threats together.
