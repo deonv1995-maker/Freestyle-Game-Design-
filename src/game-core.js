@@ -58,8 +58,11 @@ export const HAZARD_CONFIG = Object.freeze({
 
 export const DRONE_CONFIG = Object.freeze({
   radius: 18,
+  firstChunk: 1,
+  encounterChunkSpacing: 2,
   basePerChunk: 1,
-  maxPerChunk: 3,
+  extraDroneDifficultyStep: 5,
+  maxPerChunk: 2,
   minSpeed: 210,
   maxSpeed: 390,
   acquireRange: 760,
@@ -71,7 +74,10 @@ export const DRONE_CONFIG = Object.freeze({
   projectileMaxSpeed: 680,
   projectileLifetime: 3.2,
   maxProjectiles: 28,
-  corridorPadding: 72
+  corridorPadding: 72,
+  verticalInset: 170,
+  verticalJitter: 20,
+  difficultyCap: 10
 });
 
 export const EFFECT_CONFIG = Object.freeze({
@@ -152,23 +158,6 @@ export const STARTER_HAZARDS = Object.freeze([
       phaseTime: 0.35,
       sourceSide: "left"
     })
-  })
-]);
-
-const STARTER_DRONES = Object.freeze([
-  Object.freeze({
-    id: "starter-drone-0",
-    chunkIndex: null,
-    x: 105,
-    y: 270,
-    homeX: 105,
-    homeY: 270,
-    difficulty: 1,
-    speed: 220,
-    fireInterval: 1.9,
-    projectileSpeed: 430,
-    cooldown: 1.15,
-    phase: 0.3
   })
 ]);
 
@@ -472,7 +461,7 @@ export function refreshWorldForFocus(state, focusY) {
   const surfaces = STARTER_SURFACES.map(cloneWorldItem);
   const hazards = STARTER_HAZARDS.map(cloneWorldItem);
   const checkpoints = [];
-  const droneDefinitions = STARTER_DRONES.map((drone) => ({ ...drone }));
+  const droneDefinitions = [];
 
   for (let chunkIndex = startChunk; chunkIndex <= endChunk; chunkIndex += 1) {
     surfaces.push(...generateWorldChunk(chunkIndex));
@@ -633,30 +622,54 @@ export function generateHazardChunk(chunkIndex) {
 
 export function generateDroneChunk(chunkIndex) {
   const safeIndex = Math.max(0, Math.floor(chunkIndex));
-  const chunkBottomY = WORLD_CONFIG.proceduralStartY - safeIndex * WORLD_CONFIG.chunkHeight;
-  const difficulty = difficultyForChunk(safeIndex);
+
+  if (safeIndex < DRONE_CONFIG.firstChunk) {
+    return [];
+  }
+
+  const chunkOffset = safeIndex - DRONE_CONFIG.firstChunk;
+  if (chunkOffset % DRONE_CONFIG.encounterChunkSpacing !== 0) {
+    return [];
+  }
+
+  const encounterIndex = Math.floor(
+    chunkOffset / DRONE_CONFIG.encounterChunkSpacing
+  );
+  const chunkBottomY =
+    WORLD_CONFIG.proceduralStartY - safeIndex * WORLD_CONFIG.chunkHeight;
+  const difficulty = Math.min(
+    DRONE_CONFIG.difficultyCap,
+    encounterIndex + 1
+  );
   const count = Math.min(
     DRONE_CONFIG.maxPerChunk,
-    DRONE_CONFIG.basePerChunk + Math.floor((difficulty - 1) / 3)
+    DRONE_CONFIG.basePerChunk +
+      Math.floor((difficulty - 1) / DRONE_CONFIG.extraDroneDifficultyStep)
   );
   const drones = [];
   const usableWidth =
     CORRIDOR_RIGHT - CORRIDOR_LEFT - DRONE_CONFIG.corridorPadding * 2;
+  const verticalSpan =
+    WORLD_CONFIG.chunkHeight - DRONE_CONFIG.verticalInset * 2;
 
   for (let index = 0; index < count; index += 1) {
-    const lane = (index + 1) / (count + 1);
+    const lane = count === 1 ? 0.5 : index / (count - 1);
     const x =
       CORRIDOR_LEFT +
       DRONE_CONFIG.corridorPadding +
       seededUnit(safeIndex, 30 + index) * usableWidth;
     const y =
       chunkBottomY -
-      120 -
-      lane * (WORLD_CONFIG.chunkHeight - 240) +
-      (seededUnit(safeIndex, 40 + index) - 0.5) * 60;
+      DRONE_CONFIG.verticalInset -
+      lane * verticalSpan +
+      (seededUnit(safeIndex, 40 + index) - 0.5) *
+        DRONE_CONFIG.verticalJitter *
+        2;
     const speed = Math.min(
       DRONE_CONFIG.maxSpeed,
-      DRONE_CONFIG.minSpeed + (difficulty - 1) * 16 + seededUnit(safeIndex, 50 + index) * 34
+      DRONE_CONFIG.minSpeed +
+        (difficulty - 1) * 16 +
+        seededUnit(safeIndex, 50 + index) * 34
     );
     const fireInterval = Math.max(
       DRONE_CONFIG.minFireInterval,
@@ -685,7 +698,6 @@ export function generateDroneChunk(chunkIndex) {
 
   return drones;
 }
-
 
 export function generateCheckpoint(chunkIndex) {
   const safeIndex = Math.max(0, Math.floor(chunkIndex));
