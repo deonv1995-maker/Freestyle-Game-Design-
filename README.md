@@ -4,7 +4,7 @@ An experimental game-design repository for rapidly turning ideas into playable p
 
 This project is intentionally open-ended. It may become one game, several experiments, or a place to test unusual mechanics before deciding what deserves deeper development.
 
-## Current playable slice — Energy Relay 0.22
+## Current playable slice — Energy Relay 0.23
 
 - The app now opens on a dedicated start screen. Pressing Play opens a compact three-point tutorial, and gameplay remains paused until Start Run is pressed.
 - The player remains permanently in the blue energy-orb state; there is no human reform state.
@@ -20,11 +20,11 @@ This project is intentionally open-ended. It may become one game, several experi
 
 ## Technical foundation
 
-The first prototype uses browser-native HTML5 Canvas and JavaScript with no runtime dependencies.
+Energy Relay uses browser-native HTML5 Canvas and JavaScript with no runtime dependencies.
 
 Gameplay state, deterministic chunk/NPC generation, active world geometry, NPC behavior and collision physics live in `src/game-core.js`. Pointer input, camera presentation, rendering and HUD presentation live in `src/game.js`.
 
-The static build is produced by `scripts/build.mjs`, and the repository includes automated gameplay-state, collision and procedural-world tests plus GitHub Actions verification.
+The static build is produced by `scripts/build.mjs`, and the repository includes automated gameplay-state, collision and procedural-world tests plus GitHub Actions verification. The Android wrapper targets API 36 and CI produces both a test APK and a Google Play release App Bundle.
 
 This choice is intentionally lightweight. It is not a permanent commitment to a larger engine if future experiments require one.
 
@@ -72,4 +72,4 @@ Once a playable build exists, `main` is treated as the stable baseline. Experime
 - `docs/DEVELOPMENT_RULES.md` — implementation and stability rules.
 - `docs/DECISIONS.md` — durable design and architecture decisions.
 - `docs/IDEA_LOG.md` — ideas worth keeping, rejecting, revisiting, or combining.
-- `docs/TESTING.md` — how each playable iteration should be checked before moving forward.
+- `docs/TESTING.md` — how each playable iteration should be checked before moving forward.\n- `docs/GOOGLE_PLAY_RELEASE.md` — Android signing, Play Console declarations, store-asset requirements and the physical-device release gate.
