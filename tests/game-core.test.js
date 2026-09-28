@@ -304,6 +304,61 @@ test("left and right moving platforms are deterministic and move horizontally", 
   assert.ok(moving.every((surface) => surface.motion?.axis === "x"));
 });
 
+test("moving platforms depenetrate an orb instead of trapping it", () => {
+  const state = createGameState();
+  const platform = getWorldSurfaces(state).find(
+    (surface) => surface.id === "starter-moving-platform"
+  );
+
+  state.mode = "orb";
+  state.orb.x = platform.x + platform.width * 0.5;
+  state.orb.y = platform.y + platform.height * 0.5;
+  state.orb.vx = 0;
+  state.orb.vy = 300;
+  state.orb.invulnerability = 2;
+
+  stepGame(state, 0.01);
+
+  const overlap = findEarliestSurfaceCollision(
+    state,
+    state.orb.x,
+    state.orb.y,
+    state.orb.x,
+    state.orb.y,
+    GAME_CONFIG.orbRadius
+  );
+
+  assert.equal(overlap, null);
+  assert.ok(state.orb.vy < 0);
+  assert.equal(state.mode, "orb");
+});
+
+test("platform overlap correction preserves an active launch aim", () => {
+  const state = createGameState();
+  const platform = getWorldSurfaces(state).find(
+    (surface) => surface.id === "starter-moving-platform"
+  );
+
+  state.orb.x = platform.x + platform.width * 0.5;
+  state.orb.y = platform.y + platform.height * 0.5;
+
+  assert.equal(beginAim(state, 100, 300, 77), true);
+  stepGame(state, 0.01);
+
+  const overlap = findEarliestSurfaceCollision(
+    state,
+    state.orb.x,
+    state.orb.y,
+    state.orb.x,
+    state.orb.y,
+    GAME_CONFIG.orbRadius
+  );
+
+  assert.equal(overlap, null);
+  assert.equal(state.mode, "aiming");
+  assert.equal(state.launch.pointerId, 77);
+});
+
 test("starter course and generated chunks use lasers without spike hazards", () => {
   const generated = generateHazardChunk(8);
   const hazards = [...STARTER_HAZARDS, ...generated];
