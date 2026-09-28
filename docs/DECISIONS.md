@@ -288,3 +288,14 @@ The public Android package ID remains `com.freestylegamedesign.spearrelay` for t
 
 Reason: Google Play's 2026 target-API policy requires new apps and app updates to target API 36, new apps publish with Android App Bundles, and store signing credentials must not be committed to source control.
 
+
+
+## 2026-09-28 — Life HUD uses seven orb replicas
+
+Decision: the gameplay HUD no longer renders the status/hint information panel. The top-left HUD surface is a compact row of orb replicas generated from `GAME_CONFIG.startingLives`, while the existing Reset control remains independent on the right.
+
+Decision: the simulation remains the only source of truth for life loss. The browser/UI layer observes the existing respawn serial and restart count, animates the corresponding orb from right to left, and marks it spent only after the explosion completes. When the seventh life triggers the simulation's automatic run restart, the last orb explodes before the visual rail repopulates from the reset authoritative life count.
+
+Decision: life-orb explosion state is presentation-only. It does not add a second life counter, delay respawn, alter checkpoint state, or change invulnerability. Reduced-motion preference skips the decorative motion while preserving the same life visibility and reset behavior.
+
+Reason: lives should be readable at a glance and visually match the player character without reintroducing duplicated gameplay state or coupling deterministic run logic to DOM animation timing.
