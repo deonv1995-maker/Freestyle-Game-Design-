@@ -259,3 +259,11 @@ Decision: drone difficulty is no longer derived directly from every world chunk.
 Decision: multi-drone encounters use centralized vertical inset and jitter values so two drones are laid out across the safe height of the chunk rather than compressed into the middle.
 
 Reason: drones should enter as a later pressure layer, remain readable as distinct encounters, and build difficulty gradually without competing with the laser timing challenge too early or clustering several threats together.
+
+## 2026-09-28 — Start screen and tutorial gate gameplay
+
+Decision: application onboarding is owned by the browser/UI layer rather than the authoritative simulation. The app starts in a menu phase with a dedicated Play button. Play opens a compact tutorial covering launch/redirection, touch slow motion, hazards, drones, checkpoints and the seven-life run. Gameplay begins only after Start Run is pressed.
+
+Decision: the simulation does not call `stepGame` while the menu or tutorial is visible, and pointer input is rejected outside the playing phase. Starting a run creates a fresh game state and resets presentation-only trail/respawn timing without changing persistent best-distance storage.
+
+Reason: players need a clear entry point and enough instruction to understand the control loop without allowing hazards, timers or procedural systems to advance behind onboarding UI. Keeping this state outside `game-core.js` preserves the existing deterministic gameplay architecture and prevents presentation flow from becoming a competing source of gameplay truth.
