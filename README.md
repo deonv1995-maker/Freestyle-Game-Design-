@@ -29,7 +29,7 @@ This choice is intentionally lightweight. It is not a permanent commitment to a 
 
 ## Phone testing
 
-The deployed GitHub Pages build includes a web-app manifest and dedicated Spear Relay icon. On Android, open the deployed prototype in Chrome, use the browser menu, and choose **Add to Home screen** or **Install app** when offered. The shortcut opens in standalone mode so repeated phone testing is one tap from the home screen.
+The deployed GitHub Pages build includes a web-app manifest and a dedicated Energy Relay icon built around the blue orb, corridor, laser and drone visual language. On Android, open the deployed prototype in Chrome, use the browser menu, and choose **Add to Home screen** or **Install app** when offered. The shortcut opens in standalone mode so repeated phone testing is one tap from the home screen.
 
 A service worker is intentionally not used yet. Keeping the prototype free of an offline cache reduces the chance of an older build being mistaken for the newest test after a deployment.
 
