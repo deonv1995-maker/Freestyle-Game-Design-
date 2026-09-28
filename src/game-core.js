@@ -393,6 +393,12 @@ export function stepGame(state, deltaSeconds) {
 
   refreshWorldForFocus(state, state.orb.y);
   updateDynamicWorld(state);
+
+  // Moving platforms can advance into the orb between simulation frames.
+  // Resolve any resulting overlap before NPC/projectile checks or the swept
+  // flight step so the orb can never remain embedded in solid geometry.
+  resolveOrbSurfaceOverlap(state);
+
   updateDrones(state, gameplayDt);
   advanceProjectiles(state, gameplayDt);
 
@@ -1033,6 +1039,60 @@ function findEarliestLethalCollision(state, startX, startY, endX, endY) {
   }
 
   return earliest;
+}
+
+function resolveOrbSurfaceOverlap(state) {
+  const maxPasses = 4;
+
+  for (let pass = 0; pass < maxPasses; pass += 1) {
+    let best = null;
+
+    for (const surface of state.world.surfaces) {
+      const rect = expandedRect(surface, GAME_CONFIG.orbRadius);
+      const right = rect.x + rect.width;
+      const bottom = rect.y + rect.height;
+
+      if (
+        state.orb.x <= rect.x ||
+        state.orb.x >= right ||
+        state.orb.y <= rect.y ||
+        state.orb.y >= bottom
+      ) {
+        continue;
+      }
+
+      const candidates = [
+        { penetration: state.orb.x - rect.x, normalX: -1, normalY: 0 },
+        { penetration: right - state.orb.x, normalX: 1, normalY: 0 },
+        { penetration: state.orb.y - rect.y, normalX: 0, normalY: -1 },
+        { penetration: bottom - state.orb.y, normalX: 0, normalY: 1 }
+      ];
+
+      for (const candidate of candidates) {
+        if (!best || candidate.penetration < best.penetration) {
+          best = { ...candidate, surface };
+        }
+      }
+    }
+
+    if (!best) return false;
+
+    // Move to the exact expanded boundary first. bounceOrbFromSurface then
+    // applies the normal separation margin and reflects only inward velocity.
+    state.orb.x += best.normalX * best.penetration;
+    state.orb.y += best.normalY * best.penetration;
+
+    bounceOrbFromSurface(state, {
+      t: 0,
+      x: state.orb.x,
+      y: state.orb.y,
+      normalX: best.normalX,
+      normalY: best.normalY,
+      surface: best.surface
+    });
+  }
+
+  return true;
 }
 
 function bounceOrbFromSurface(state, hit) {
