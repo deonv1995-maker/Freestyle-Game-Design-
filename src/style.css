@@ -40,6 +40,7 @@ canvas { -webkit-tap-highlight-color: transparent; }
 
 .hud {
   position: absolute;
+  z-index: 5;
   top: max(14px, env(safe-area-inset-top));
   left: max(14px, env(safe-area-inset-left));
   right: max(14px, env(safe-area-inset-right));
@@ -48,6 +49,12 @@ canvas { -webkit-tap-highlight-color: transparent; }
   justify-content: space-between;
   gap: 12px;
   pointer-events: none;
+  transition: opacity 160ms ease, visibility 160ms ease;
+}
+
+.hud.is-hidden {
+  opacity: 0;
+  visibility: hidden;
 }
 
 .hud-copy {
@@ -90,6 +97,7 @@ canvas { -webkit-tap-highlight-color: transparent; }
 
 .prototype-tag {
   position: absolute;
+  z-index: 4;
   left: 50%;
   bottom: max(11px, env(safe-area-inset-bottom));
   transform: translateX(-50%);
@@ -108,4 +116,144 @@ canvas { -webkit-tap-highlight-color: transparent; }
 
 @media (prefers-reduced-motion: reduce) {
   #resetButton:active { transform: none; }
+}
+
+
+.screen-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  display: grid;
+  place-items: center;
+  padding: max(24px, env(safe-area-inset-top)) max(20px, env(safe-area-inset-right)) max(24px, env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left));
+  background:
+    radial-gradient(circle at 50% 32%, rgb(40 135 202 / 24%), transparent 34%),
+    linear-gradient(180deg, rgb(5 10 20 / 52%), rgb(5 9 17 / 84%));
+  backdrop-filter: blur(4px);
+  transition: opacity 180ms ease, visibility 180ms ease;
+}
+
+.screen-layer.is-hidden {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.screen-card {
+  width: min(88vw, 460px);
+  padding: clamp(24px, 7vw, 36px);
+  border: 1px solid rgb(128 219 255 / 22%);
+  border-radius: 24px;
+  background: linear-gradient(180deg, rgb(13 25 43 / 94%), rgb(8 15 28 / 94%));
+  box-shadow: 0 24px 70px rgb(0 0 0 / 42%), inset 0 1px 0 rgb(255 255 255 / 7%);
+  text-align: center;
+}
+
+.screen-eyebrow {
+  display: inline-block;
+  margin-bottom: 10px;
+  color: #73dcff;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.2em;
+}
+
+.screen-card h1,
+.screen-card h2 {
+  margin: 0;
+  color: #f7fbff;
+  font-size: clamp(30px, 9vw, 46px);
+  line-height: 1.02;
+  letter-spacing: -0.035em;
+}
+
+.screen-card h2 { font-size: clamp(27px, 8vw, 38px); }
+
+.screen-card > p {
+  margin: 16px auto 24px;
+  max-width: 36ch;
+  color: rgb(231 241 250 / 78%);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.primary-action {
+  min-width: 164px;
+  min-height: 50px;
+  padding: 12px 24px;
+  border: 1px solid rgb(154 232 255 / 55%);
+  border-radius: 15px;
+  background: linear-gradient(180deg, #4fc8ff, #168bd6);
+  box-shadow: 0 10px 28px rgb(34 161 230 / 26%), inset 0 1px 0 rgb(255 255 255 / 42%);
+  color: #03111d;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.primary-action:active { transform: translateY(1px); }
+
+.tutorial-card {
+  width: min(90vw, 500px);
+  text-align: left;
+}
+
+.tutorial-card .screen-eyebrow,
+.tutorial-card h2 { text-align: left; }
+
+.tutorial-steps {
+  display: grid;
+  gap: 12px;
+  margin: 20px 0 24px;
+}
+
+.tutorial-step {
+  display: grid;
+  grid-template-columns: 34px 1fr;
+  gap: 12px;
+  align-items: start;
+  padding: 12px;
+  border: 1px solid rgb(255 255 255 / 9%);
+  border-radius: 14px;
+  background: rgb(255 255 255 / 4%);
+}
+
+.tutorial-number {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border-radius: 50%;
+  background: rgb(87 205 255 / 16%);
+  color: #8ce5ff;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.tutorial-step p {
+  margin: 0;
+  color: rgb(236 244 250 / 76%);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.tutorial-step strong {
+  display: block;
+  margin-bottom: 2px;
+  color: #f7fbff;
+  font-size: 13px;
+}
+
+.tutorial-card .primary-action {
+  display: block;
+  width: 100%;
+}
+
+@media (max-height: 620px) {
+  .screen-card { padding: 20px; }
+  .tutorial-steps { gap: 8px; margin: 14px 0 18px; }
+  .tutorial-step { padding: 9px 10px; }
 }
