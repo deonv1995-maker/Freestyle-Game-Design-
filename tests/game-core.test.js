@@ -610,16 +610,38 @@ test("zero gravity preserves free-flight velocity", () => {
   assert.equal(state.orb.vy, -300);
 });
 
-test("drones are deterministic, slower than the orb and scale with difficulty", () => {
-  const easy = generateDroneChunk(0);
-  const hard = generateDroneChunk(7);
-  const easyAgain = generateDroneChunk(0);
+test("drones start later, stay spaced out and scale gradually", () => {
+  const beforeDrones = generateDroneChunk(DRONE_CONFIG.firstChunk - 1);
+  const easy = generateDroneChunk(DRONE_CONFIG.firstChunk);
+  const skipped = generateDroneChunk(
+    DRONE_CONFIG.firstChunk + DRONE_CONFIG.encounterChunkSpacing - 1
+  );
+  const nextEncounter = generateDroneChunk(
+    DRONE_CONFIG.firstChunk + DRONE_CONFIG.encounterChunkSpacing
+  );
+  const hardChunk =
+    DRONE_CONFIG.firstChunk +
+    DRONE_CONFIG.encounterChunkSpacing * (DRONE_CONFIG.difficultyCap - 1);
+  const hard = generateDroneChunk(hardChunk);
+  const easyAgain = generateDroneChunk(DRONE_CONFIG.firstChunk);
 
+  assert.deepEqual(beforeDrones, []);
+  assert.deepEqual(skipped, []);
   assert.deepEqual(easy, easyAgain);
-  assert.ok(easy.length >= DRONE_CONFIG.basePerChunk);
+  assert.equal(easy.length, DRONE_CONFIG.basePerChunk);
+  assert.equal(nextEncounter[0].difficulty, easy[0].difficulty + 1);
   assert.ok(hard.length >= easy.length);
+  assert.ok(hard.length <= DRONE_CONFIG.maxPerChunk);
+
+  if (hard.length > 1) {
+    const sorted = [...hard].sort((a, b) => a.y - b.y);
+    for (let index = 1; index < sorted.length; index += 1) {
+      assert.ok(Math.abs(sorted[index].y - sorted[index - 1].y) >= 400);
+    }
+  }
+
   assert.ok(
-    [...easy, ...hard].every(
+    [...easy, ...nextEncounter, ...hard].every(
       (drone) =>
         drone.speed < GAME_CONFIG.maxOrbSpeed &&
         drone.projectileSpeed < GAME_CONFIG.maxOrbSpeed
@@ -687,7 +709,7 @@ test("nearby drones eventually fire targeted projectiles", () => {
 test("orb contact destroys a drone without costing a life", () => {
   const state = createGameState();
   const drone = getWorldDrones(state).find(
-    (candidate) => candidate.id === "chunk-0-drone-0"
+    (candidate) => candidate.id === "chunk-1-drone-0"
   );
   const startingLives = state.lives;
 
@@ -746,9 +768,11 @@ test("orb contact destroys a drone without costing a life", () => {
   assert.equal(getDroneExplosions(state).length, 0);
 });
 
-test("procedural hazard difficulty increases as checkpoint chunks advance", () => {
-  const earlyDrone = generateDroneChunk(0)[0];
-  const lateDrone = generateDroneChunk(8)[0];
+test("procedural hazards increase difficulty on their own pacing curves", () => {
+  const earlyDrone = generateDroneChunk(DRONE_CONFIG.firstChunk)[0];
+  const lateDrone = generateDroneChunk(
+    DRONE_CONFIG.firstChunk + DRONE_CONFIG.encounterChunkSpacing * 8
+  )[0];
   const earlyLaser = generateHazardChunk(0).find((hazard) => hazard.type === "laser");
   const lateLaser = generateHazardChunk(8).find((hazard) => hazard.type === "laser");
 
@@ -792,7 +816,7 @@ test("world streaming remains bounded far into an upward run", () => {
   const activeChunks = WORLD_CONFIG.chunksBehind + WORLD_CONFIG.chunksAhead + 1;
   assert.ok(getWorldSurfaces(state).length <= STARTER_SURFACES.length + activeChunks * 4);
   assert.ok(getWorldHazards(state).length <= STARTER_HAZARDS.length + activeChunks * 2);
-  assert.ok(getWorldDrones(state).length <= 1 + activeChunks * DRONE_CONFIG.maxPerChunk);
+  assert.ok(getWorldDrones(state).length <= activeChunks * DRONE_CONFIG.maxPerChunk);
   assert.ok(getWorldCheckpoints(state).length <= activeChunks);
 });
 
@@ -820,6 +844,11 @@ test("configured space-corridor values remain physically valid", () => {
     DRONE_CONFIG.preFireWarningDuration <
       DRONE_CONFIG.baseFireInterval
   );
+  assert.ok(DRONE_CONFIG.firstChunk > 0);
+  assert.ok(DRONE_CONFIG.encounterChunkSpacing >= 2);
+  assert.equal(DRONE_CONFIG.maxPerChunk, 2);
+  assert.ok(DRONE_CONFIG.verticalInset > 0);
+  assert.ok(DRONE_CONFIG.verticalJitter >= 0);
   assert.ok(WORLD_CONFIG.corridorLeft < WORLD_CONFIG.corridorRight);
   assert.ok(WORLD_CONFIG.chunkHeight > 0);
 });
