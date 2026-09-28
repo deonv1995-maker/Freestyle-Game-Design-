@@ -22,8 +22,18 @@ const ctx = canvas.getContext("2d", { alpha: false });
 const statusNode = document.querySelector("#status");
 const hintNode = document.querySelector("#hint");
 const resetButton = document.querySelector("#resetButton");
+const hudNode = document.querySelector(".hud");
+const startScreen = document.querySelector("#startScreen");
+const tutorialScreen = document.querySelector("#tutorialScreen");
+const playButton = document.querySelector("#playButton");
+const startRunButton = document.querySelector("#startRunButton");
 
 const RECORD_KEY = "energy-relay-best-distance-metres-v1";
+const APP_PHASE = Object.freeze({
+  MENU: "menu",
+  TUTORIAL: "tutorial",
+  PLAYING: "playing"
+});
 
 let state = createGameState();
 let trail = [];
@@ -34,8 +44,37 @@ let pixelRatio = 1;
 let lastHudSnapshot = "";
 let lastRespawnSerial = state.run.respawnSerial;
 let bestDistanceMetres = loadBestDistance();
+let appPhase = APP_PHASE.MENU;
 
 const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+function setAppPhase(nextPhase) {
+  appPhase = nextPhase;
+
+  const showMenu = nextPhase === APP_PHASE.MENU;
+  const showTutorial = nextPhase === APP_PHASE.TUTORIAL;
+  const showHud = nextPhase === APP_PHASE.PLAYING;
+
+  startScreen.classList.toggle("is-hidden", !showMenu);
+  startScreen.setAttribute("aria-hidden", String(!showMenu));
+  tutorialScreen.classList.toggle("is-hidden", !showTutorial);
+  tutorialScreen.setAttribute("aria-hidden", String(!showTutorial));
+  hudNode.classList.toggle("is-hidden", !showHud);
+
+  if (showHud) {
+    lastTime = performance.now();
+    lastHudSnapshot = "";
+    updateHud();
+  }
+}
+
+function resetRunState() {
+  state = createGameState();
+  trail = [];
+  lastRespawnSerial = state.run.respawnSerial;
+  lastHudSnapshot = "";
+  lastTime = performance.now();
+}
 
 function resizeCanvas() {
   const rect = canvas.getBoundingClientRect();
@@ -842,21 +881,24 @@ function frame(now) {
   const dt = Math.min(0.05, Math.max(0, (now - lastTime) / 1000));
   lastTime = now;
 
-  stepGame(state, reduceMotion ? Math.min(dt, 1 / 30) : dt);
+  if (appPhase === APP_PHASE.PLAYING) {
+    stepGame(state, reduceMotion ? Math.min(dt, 1 / 30) : dt);
 
-  if (state.run.respawnSerial !== lastRespawnSerial) {
-    lastRespawnSerial = state.run.respawnSerial;
-    trail = [];
+    if (state.run.respawnSerial !== lastRespawnSerial) {
+      lastRespawnSerial = state.run.respawnSerial;
+      trail = [];
+    }
+
+    recordTrail();
+    updateRecord();
+
+    if (state.mode === "ready" && trail.length > 0) {
+      trail.shift();
+    }
+
+    updateHud();
   }
 
-  recordTrail();
-  updateRecord();
-
-  if (state.mode === "ready" && trail.length > 0) {
-    trail.shift();
-  }
-
-  updateHud();
   render();
   requestAnimationFrame(frame);
 }
@@ -870,6 +912,7 @@ function pointerPosition(event) {
 }
 
 canvas.addEventListener("pointerdown", (event) => {
+  if (appPhase !== APP_PHASE.PLAYING) return;
   if (state.mode !== "ready" && state.mode !== "orb") return;
 
   event.preventDefault();
@@ -908,11 +951,17 @@ canvas.addEventListener("pointercancel", (event) => {
   updateHud();
 });
 
+playButton.addEventListener("click", () => {
+  setAppPhase(APP_PHASE.TUTORIAL);
+});
+
+startRunButton.addEventListener("click", () => {
+  resetRunState();
+  setAppPhase(APP_PHASE.PLAYING);
+});
+
 resetButton.addEventListener("click", () => {
-  state = createGameState();
-  trail = [];
-  lastRespawnSerial = state.run.respawnSerial;
-  lastHudSnapshot = "";
+  resetRunState();
   updateHud();
 });
 
@@ -952,4 +1001,5 @@ function mod(value, divisor) {
 
 resizeCanvas();
 updateHud();
+setAppPhase(APP_PHASE.MENU);
 requestAnimationFrame(frame);
