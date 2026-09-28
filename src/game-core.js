@@ -6,12 +6,12 @@ const START_POSITION = Object.freeze({ x: 0, y: START_Y });
 
 export const GAME_CONFIG = Object.freeze({
   orbGravity: 0,
-  minLaunchSpeed: 280,
-  maxLaunchSpeed: 980,
+  minLaunchSpeed: 260,
+  maxLaunchSpeed: 900,
   maxAimDistance: 220,
   aimDeadzone: 14,
   orbRadius: 16,
-  maxOrbSpeed: 1180,
+  maxOrbSpeed: 1080,
   bounceRestitution: 0.8,
   bounceTangentialDamping: 0.97,
   bounceSeparation: 1.5,
