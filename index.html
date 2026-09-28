@@ -16,7 +16,46 @@
   <main class="game-shell">
     <canvas id="gameCanvas" aria-label="Energy Relay prototype game area"></canvas>
 
-    <section class="hud" aria-live="polite">
+    <section id="startScreen" class="screen-layer" aria-labelledby="startTitle">
+      <div class="screen-card start-card">
+        <span class="screen-eyebrow">ENERGY RELAY</span>
+        <h1 id="startTitle">Survive the ascent.</h1>
+        <p>
+          Launch the energy orb through a zero-gravity corridor, redirect in slow motion,
+          and push your distance record higher with every run.
+        </p>
+        <button id="playButton" class="primary-action" type="button">Play</button>
+      </div>
+    </section>
+
+    <section
+      id="tutorialScreen"
+      class="screen-layer is-hidden"
+      aria-labelledby="tutorialTitle"
+      aria-hidden="true"
+    >
+      <div class="screen-card tutorial-card">
+        <span class="screen-eyebrow">QUICK BRIEFING</span>
+        <h2 id="tutorialTitle">Master the orb</h2>
+        <div class="tutorial-steps">
+          <div class="tutorial-step">
+            <span class="tutorial-number">1</span>
+            <p><strong>Launch & redirect</strong> Touch, drag in the direction you want to travel, then release.</p>
+          </div>
+          <div class="tutorial-step">
+            <span class="tutorial-number">2</span>
+            <p><strong>Use slow motion</strong> Touch again while flying to slow time, re-aim, and change direction.</p>
+          </div>
+          <div class="tutorial-step">
+            <span class="tutorial-number">3</span>
+            <p><strong>Survive</strong> Avoid laser beams and drone shots, ram drones, and reach checkpoints before your seven lives run out.</p>
+          </div>
+        </div>
+        <button id="startRunButton" class="primary-action" type="button">Start Run</button>
+      </div>
+    </section>
+
+    <section class="hud is-hidden" aria-live="polite">
       <div class="hud-copy">
         <strong id="status">ORB READY</strong>
         <span id="hint">Touch to slow time, read the laser flicker, and watch drone charge rings before they fire.</span>
@@ -24,7 +63,7 @@
       <button id="resetButton" type="button">Reset</button>
     </section>
 
-    <div class="prototype-tag" aria-hidden="true">ENERGY RELAY · PROTOTYPE 0.20</div>
+    <div class="prototype-tag" aria-hidden="true">ENERGY RELAY · PROTOTYPE 0.21</div>
   </main>
 
   <script type="module" src="./src/game.js"></script>
