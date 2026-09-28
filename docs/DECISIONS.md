@@ -288,9 +288,3 @@ The public Android package ID remains `com.freestylegamedesign.spearrelay` for t
 
 Reason: Google Play's 2026 target-API policy requires new apps and app updates to target API 36, new apps publish with Android App Bundles, and store signing credentials must not be committed to source control.
 
-
-## 2026-09-28 — Moving platforms actively recover overlapping orbs
-
-Decision: after dynamic world motion is applied, gameplay resolves any orb overlap with solid world surfaces before drones, projectiles, or the swept flight step run. Recovery uses the minimum-penetration axis and then passes through the existing rebound/separation behavior.
-
-Reason: swept orb-vs-surface collision correctly prevents tunnelling while the orb moves, but a moving platform can itself enter a slow or resting orb between frames. Resolving dynamic-surface overlap at the authoritative gameplay layer prevents repeated zero-time collisions and platform trapping without weakening or duplicating collision geometry.
