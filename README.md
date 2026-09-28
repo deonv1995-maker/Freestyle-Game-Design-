@@ -4,8 +4,9 @@ An experimental game-design repository for rapidly turning ideas into playable p
 
 This project is intentionally open-ended. It may become one game, several experiments, or a place to test unusual mechanics before deciding what deserves deeper development.
 
-## Current playable slice — Energy Relay 0.21
+## Current playable slice — Energy Relay 0.22
 
+- The app now opens on a dedicated start screen. Pressing Play opens a compact three-point tutorial, and gameplay remains paused until Start Run is pressed.
 - The player remains permanently in the blue energy-orb state; there is no human reform state.
 - Movement is now true zero-gravity/inertial motion: the orb has no constant downward acceleration. It keeps its current velocity until a redirect, collision or damping event changes it.
 - The run progresses from the bottom of the screen upward through a narrow space corridor with continuous left and right walls plus a solid rebound wall closing the starting end.
