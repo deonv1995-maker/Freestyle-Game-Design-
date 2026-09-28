@@ -1,19 +1,31 @@
+import groovy.json.JsonSlurper
+
 plugins {
     id 'com.android.application'
 }
 
+def packageMetadata = new JsonSlurper().parse(rootProject.file('../package.json'))
 def buildNumber = (System.getenv("GITHUB_RUN_NUMBER") ?: "1").toInteger()
+def uploadKeystorePath = System.getenv("ANDROID_UPLOAD_KEYSTORE_PATH")
+def uploadStorePassword = System.getenv("ANDROID_UPLOAD_STORE_PASSWORD")
+def uploadKeyAlias = System.getenv("ANDROID_UPLOAD_KEY_ALIAS")
+def uploadKeyPassword = System.getenv("ANDROID_UPLOAD_KEY_PASSWORD")
+def hasUploadSigning =
+    uploadKeystorePath &&
+    uploadStorePassword &&
+    uploadKeyAlias &&
+    uploadKeyPassword
 
 android {
     namespace 'com.freestylegamedesign.spearrelay'
-    compileSdk 35
+    compileSdk 36
 
     defaultConfig {
         applicationId 'com.freestylegamedesign.spearrelay'
         minSdk 26
-        targetSdk 35
+        targetSdk 36
         versionCode buildNumber
-        versionName "0.1.${buildNumber}"
+        versionName packageMetadata.version as String
     }
 
     signingConfigs {
@@ -23,12 +35,29 @@ android {
             keyAlias 'androiddebugkey'
             keyPassword 'android'
         }
+
+        if (hasUploadSigning) {
+            release {
+                storeFile file(uploadKeystorePath)
+                storePassword uploadStorePassword
+                keyAlias uploadKeyAlias
+                keyPassword uploadKeyPassword
+            }
+        }
     }
 
     buildTypes {
         debug {
             signingConfig signingConfigs.test
             debuggable true
+            minifyEnabled false
+        }
+
+        release {
+            if (hasUploadSigning) {
+                signingConfig signingConfigs.release
+            }
+            debuggable false
             minifyEnabled false
         }
     }

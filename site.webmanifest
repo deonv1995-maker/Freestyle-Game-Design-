@@ -1,8 +1,8 @@
 {
   "id": "./",
-  "name": "Energy Relay — Freestyle Game Design",
+  "name": "Energy Relay",
   "short_name": "Energy Relay",
-  "description": "Mobile-first energy-orb traversal prototype with direct drag aiming, midair time-freeze redirection, and rebound collisions.",
+  "description": "Zero-gravity energy-orb traversal with drag aiming, slow-motion redirection, moving hazards, checkpoints, and drone encounters.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

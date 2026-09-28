@@ -7,17 +7,18 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <title>Freestyle Game Design — Energy Relay</title>
+  <title>Energy Relay</title>
   <link rel="manifest" href="./site.webmanifest">
   <link rel="icon" href="./assets/branding/app-icon.svg" type="image/svg+xml" sizes="any">
   <link rel="stylesheet" href="./src/style.css">
 </head>
 <body>
   <main class="game-shell">
-    <canvas id="gameCanvas" aria-label="Energy Relay prototype game area"></canvas>
+    <canvas id="gameCanvas" aria-label="Energy Relay game area"></canvas>
 
     <section id="startScreen" class="screen-layer" aria-labelledby="startTitle">
       <div class="screen-card start-card">
+        <img class="brand-mark" src="./assets/branding/app-icon.svg" alt="" width="96" height="96">
         <span class="screen-eyebrow">ENERGY RELAY</span>
         <h1 id="startTitle">Survive the ascent.</h1>
         <p>
@@ -25,6 +26,9 @@
           and push your distance record higher with every run.
         </p>
         <button id="playButton" class="primary-action" type="button">Play</button>
+        <div class="start-footer">
+          <a href="./privacy.html">Privacy</a>
+        </div>
       </div>
     </section>
 
@@ -63,7 +67,6 @@
       <button id="resetButton" type="button">Reset</button>
     </section>
 
-    <div class="prototype-tag" aria-hidden="true">ENERGY RELAY · PROTOTYPE 0.22</div>
   </main>
 
   <script type="module" src="./src/game.js"></script>

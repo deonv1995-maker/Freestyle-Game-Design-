@@ -2,13 +2,18 @@ package com.freestylegamedesign.spearrelay;
 
 import android.app.Activity;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.view.View;
+import android.view.WindowInsets;
+import android.view.WindowInsetsController;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebResourceResponse;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+import android.window.OnBackInvokedCallback;
+import android.window.OnBackInvokedDispatcher;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -19,7 +24,9 @@ import java.util.Locale;
 
 public final class MainActivity extends Activity {
     private static final String APP_HOST = "appassets.androidplatform.net";
+
     private WebView webView;
+    private OnBackInvokedCallback backInvokedCallback;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -38,10 +45,49 @@ public final class MainActivity extends Activity {
 
         webView.setWebViewClient(new LocalAssetClient());
         setContentView(webView);
+        registerBackNavigation();
         webView.loadUrl("https://" + APP_HOST + "/index.html");
     }
 
+    private void registerBackNavigation() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+            return;
+        }
+
+        backInvokedCallback = this::handleBackNavigation;
+        getOnBackInvokedDispatcher().registerOnBackInvokedCallback(
+            OnBackInvokedDispatcher.PRIORITY_DEFAULT,
+            backInvokedCallback
+        );
+    }
+
+    private void handleBackNavigation() {
+        if (webView != null && webView.canGoBack()) {
+            webView.goBack();
+            return;
+        }
+
+        finish();
+    }
+
+    @SuppressWarnings("deprecation")
     private void enterImmersiveMode() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            getWindow().setDecorFitsSystemWindows(false);
+            WindowInsetsController controller = getWindow().getInsetsController();
+
+            if (controller != null) {
+                controller.hide(
+                    WindowInsets.Type.statusBars() |
+                    WindowInsets.Type.navigationBars()
+                );
+                controller.setSystemBarsBehavior(
+                    WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                );
+            }
+            return;
+        }
+
         getWindow().getDecorView().setSystemUiVisibility(
             View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
                 | View.SYSTEM_UI_FLAG_FULLSCREEN
@@ -79,6 +125,16 @@ public final class MainActivity extends Activity {
 
     @Override
     protected void onDestroy() {
+        if (
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            backInvokedCallback != null
+        ) {
+            getOnBackInvokedDispatcher().unregisterOnBackInvokedCallback(
+                backInvokedCallback
+            );
+            backInvokedCallback = null;
+        }
+
         if (webView != null) {
             webView.destroy();
             webView = null;
@@ -87,17 +143,19 @@ public final class MainActivity extends Activity {
     }
 
     @Override
+    @SuppressWarnings("deprecation")
     public void onBackPressed() {
-        if (webView != null && webView.canGoBack()) {
-            webView.goBack();
-            return;
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+            handleBackNavigation();
         }
-        super.onBackPressed();
     }
 
     private final class LocalAssetClient extends WebViewClient {
         @Override
-        public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
+        public WebResourceResponse shouldInterceptRequest(
+            WebView view,
+            WebResourceRequest request
+        ) {
             Uri uri = request.getUrl();
             if (!"https".equals(uri.getScheme()) || !APP_HOST.equals(uri.getHost())) {
                 return notFound();
@@ -134,7 +192,9 @@ public final class MainActivity extends Activity {
 
         private String encoding(String path) {
             String mime = mimeType(path);
-            return mime.startsWith("text/") || mime.contains("javascript") || mime.contains("json")
+            return mime.startsWith("text/") ||
+                    mime.contains("javascript") ||
+                    mime.contains("json")
                 ? "UTF-8"
                 : null;
         }
@@ -144,10 +204,14 @@ public final class MainActivity extends Activity {
             if (lower.endsWith(".html")) return "text/html";
             if (lower.endsWith(".css")) return "text/css";
             if (lower.endsWith(".js")) return "text/javascript";
-            if (lower.endsWith(".json") || lower.endsWith(".webmanifest")) return "application/json";
+            if (lower.endsWith(".json") || lower.endsWith(".webmanifest")) {
+                return "application/json";
+            }
             if (lower.endsWith(".svg")) return "image/svg+xml";
             if (lower.endsWith(".png")) return "image/png";
-            if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) return "image/jpeg";
+            if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) {
+                return "image/jpeg";
+            }
             if (lower.endsWith(".webp")) return "image/webp";
             return "application/octet-stream";
         }
