@@ -1,0 +1,27 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+
+test("start screen and tutorial gate the playable run", async () => {
+  const [html, game, css] = await Promise.all([
+    readFile(new URL("../index.html", import.meta.url), "utf8"),
+    readFile(new URL("../src/game.js", import.meta.url), "utf8"),
+    readFile(new URL("../src/style.css", import.meta.url), "utf8")
+  ]);
+
+  for (const id of ["startScreen", "playButton", "tutorialScreen", "startRunButton"]) {
+    assert.match(html, new RegExp(`id=["']${id}["']`));
+  }
+
+  assert.match(game, /MENU:\s*"menu"/);
+  assert.match(game, /TUTORIAL:\s*"tutorial"/);
+  assert.match(game, /PLAYING:\s*"playing"/);
+  assert.match(game, /if \(appPhase === APP_PHASE\.PLAYING\) \{\s*stepGame/);
+  assert.match(game, /if \(appPhase !== APP_PHASE\.PLAYING\) return;/);
+  assert.match(game, /playButton\.addEventListener\("click"/);
+  assert.match(game, /startRunButton\.addEventListener\("click"/);
+
+  assert.match(css, /\.screen-layer/);
+  assert.match(css, /\.screen-layer\.is-hidden/);
+  assert.match(css, /\.tutorial-step/);
+});
