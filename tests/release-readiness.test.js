@@ -18,9 +18,11 @@ test("Android release targets the current Google Play API level", async () => {
   assert.match(workflow, /platforms;android-36/);
   assert.match(workflow, /:app:bundleRelease/);
   assert.match(workflow, /Energy-Relay-release\.aab/);
+  assert.match(workflow, /base\/assets\/index\.html/);
+  assert.match(workflow, /OnBackInvoked\|WindowInsetsController/);
 });
 
-test("Android release keeps gameplay local and supports modern system navigation", async () => {
+test("Android release keeps gameplay local and uses a conservative launch shell", async () => {
   const [manifest, activity] = await Promise.all([
     readFile(
       new URL("../android/app/src/main/AndroidManifest.xml", import.meta.url),
@@ -38,14 +40,17 @@ test("Android release keeps gameplay local and supports modern system navigation
   assert.doesNotMatch(manifest, /android\.permission\.INTERNET/);
   assert.match(manifest, /android:usesCleartextTraffic="false"/);
   assert.match(manifest, /android:appCategory="game"/);
-  assert.match(manifest, /android:enableOnBackInvokedCallback="true"/);
-  assert.match(activity, /OnBackInvokedDispatcher/);
-  assert.match(activity, /WindowInsetsController/);
+  assert.doesNotMatch(manifest, /enableOnBackInvokedCallback/);
+  assert.doesNotMatch(activity, /android\.window\./);
+  assert.doesNotMatch(activity, /WindowInsetsController/);
+  assert.doesNotMatch(activity, /WindowInsets\.Type/);
+  assert.doesNotMatch(activity, /Build\.VERSION/);
+  assert.match(activity, /SYSTEM_UI_FLAG_IMMERSIVE_STICKY/);
   assert.match(activity, /setAllowFileAccess\(false\)/);
   assert.match(activity, /setAllowContentAccess\(false\)/);
 });
 
-test("Android launch class does not expose newer platform-only types to old devices", async () => {
+test("Android startup has a native recovery path if WebView initialization fails", async () => {
   const activity = await readFile(
     new URL(
       "../android/app/src/main/java/com/freestylegamedesign/spearrelay/MainActivity.java",
@@ -54,11 +59,8 @@ test("Android launch class does not expose newer platform-only types to old devi
     "utf8"
   );
 
-  assert.doesNotMatch(activity, /import android\.window\./);
-  assert.doesNotMatch(activity, /import android\.view\.WindowInsets/);
-  assert.match(activity, /private Object backInvokedCallback;/);
-  assert.match(activity, /private static final class Api30Impl/);
-  assert.match(activity, /private static final class Api33Impl/);
-  assert.match(activity, /Build\.VERSION\.SDK_INT < Build\.VERSION_CODES\.TIRAMISU/);
-  assert.match(activity, /Build\.VERSION\.SDK_INT >= Build\.VERSION_CODES\.R/);
+  assert.match(activity, /catch \(RuntimeException \| LinkageError startupError\)/);
+  assert.match(activity, /showStartupFallback\(startupError\)/);
+  assert.match(activity, /Energy Relay couldn’t start/);
+  assert.match(activity, /Android System WebView/);
 });
