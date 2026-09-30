@@ -89,6 +89,12 @@ jobs:
           test -f "$AAB"
           test "$(apkanalyzer manifest application-id "$APK")" = "com.freestylegamedesign.spearrelay"
           unzip -t "$AAB" >/dev/null
+          unzip -l "$AAB" | grep -q "base/assets/index.html"
+          unzip -p "$AAB" base/dex/classes.dex > "$RUNNER_TEMP/release-classes.dex"
+          if strings "$RUNNER_TEMP/release-classes.dex" | grep -Eq "OnBackInvoked|WindowInsetsController|WindowInsets\\$Type"; then
+            echo "Release DEX contains platform-only startup APIs above minSdk 26."
+            exit 1
+          fi
           mkdir -p release
           cp "$APK" release/Energy-Relay.apk
           cp "$AAB" release/Energy-Relay-release.aab
@@ -107,4 +113,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           TAG="android-test-${GITHUB_RUN_NUMBER}"
-          gh release create "$TAG" release/Energy-Relay.apk             --target "$GITHUB_SHA"             --title "Energy Relay Android Test #${GITHUB_RUN_NUMBER}"             --notes "Installable Android test build generated from commit $GITHUB_SHA."
+          gh release create "$TAG" release/Energy-Relay.apk \
+            --target "$GITHUB_SHA" \
+            --title "Energy Relay Android Test #${GITHUB_RUN_NUMBER}" \
+            --notes "Installable Android test build generated from commit $GITHUB_SHA."
