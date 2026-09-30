@@ -1,6 +1,6 @@
 # Google Play Release Readiness
 
-Last reviewed: 2026-09-28
+Last reviewed: 2026-09-30
 
 Energy Relay is being prepared as a mobile-first Android game while keeping the browser game in `src/` as the single gameplay implementation.
 
@@ -17,6 +17,10 @@ Energy Relay is being prepared as a mobile-first Android game while keeping the 
 - Release version name: read from the root `package.json`
 - Version code: GitHub Actions run number in CI
 - Play upload signing: optional secure environment configuration; no production signing key is stored in the repository
+
+The Android wrapper intentionally keeps its launch path compatible with the minimum supported API. Newer predictive-back and edge-to-edge framework types are not referenced by the launch activity. Fullscreen presentation currently uses the older system-UI flags because launch reliability takes priority over newer navigation polish.
+
+If Android cannot initialize the system WebView provider, Energy Relay must remain open on a native recovery screen rather than immediately terminating. The recovery screen directs the tester to update Chrome and Android System WebView before retrying.
 
 The package ID is a technical identity and does not need to match the public game name. However, Google Play treats it as permanent after publication. If the package should be renamed to `com.freestylegamedesign.energyrelay`, do that before the first Play Console release.
 
@@ -53,6 +57,7 @@ Before production submission:
 A candidate is ready to promote only after all of the following pass on the actual Android build:
 
 - Cold launch reaches the Energy Relay start screen.
+- If WebView initialization fails, the native recovery screen remains visible instead of the app terminating.
 - Play → tutorial → Start Run works without a reload.
 - Touch aim, slow motion and mid-air redirect remain responsive.
 - The orb cannot become embedded in moving platforms.

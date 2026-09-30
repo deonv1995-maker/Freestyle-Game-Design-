@@ -1,15 +1,18 @@
 package com.freestylegamedesign.spearrelay;
 
 import android.app.Activity;
+import android.graphics.Color;
 import android.net.Uri;
-import android.os.Build;
 import android.os.Bundle;
+import android.view.Gravity;
 import android.view.View;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebResourceResponse;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+import android.widget.LinearLayout;
+import android.widget.TextView;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -22,13 +25,20 @@ public final class MainActivity extends Activity {
     private static final String APP_HOST = "appassets.androidplatform.net";
 
     private WebView webView;
-    private Object backInvokedCallback;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         enterImmersiveMode();
 
+        try {
+            createGameWebView();
+        } catch (RuntimeException | LinkageError startupError) {
+            showStartupFallback(startupError);
+        }
+    }
+
+    private void createGameWebView() {
         webView = new WebView(this);
         webView.setBackgroundColor(0xFF101827);
 
@@ -41,19 +51,67 @@ public final class MainActivity extends Activity {
 
         webView.setWebViewClient(new LocalAssetClient());
         setContentView(webView);
-        registerBackNavigation();
         webView.loadUrl("https://" + APP_HOST + "/index.html");
     }
 
-    private void registerBackNavigation() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
-            return;
+    private void showStartupFallback(Throwable startupError) {
+        if (webView != null) {
+            webView.destroy();
+            webView = null;
         }
 
-        backInvokedCallback = Api33Impl.registerBackCallback(
-            this,
-            this::handleBackNavigation
+        LinearLayout layout = new LinearLayout(this);
+        layout.setOrientation(LinearLayout.VERTICAL);
+        layout.setGravity(Gravity.CENTER);
+        layout.setPadding(48, 48, 48, 48);
+        layout.setBackgroundColor(0xFF101827);
+
+        TextView title = new TextView(this);
+        title.setText("Energy Relay couldn’t start");
+        title.setTextColor(Color.WHITE);
+        title.setTextSize(24);
+        title.setGravity(Gravity.CENTER);
+
+        TextView message = new TextView(this);
+        message.setText(
+            "Please update Google Chrome and Android System WebView in Google Play, " +
+            "restart your phone, and open Energy Relay again."
         );
+        message.setTextColor(0xFFD7E6F2);
+        message.setTextSize(16);
+        message.setGravity(Gravity.CENTER);
+        message.setPadding(0, 28, 0, 0);
+
+        TextView detail = new TextView(this);
+        detail.setText("Startup error: " + startupError.getClass().getSimpleName());
+        detail.setTextColor(0xFF8FA9BC);
+        detail.setTextSize(12);
+        detail.setGravity(Gravity.CENTER);
+        detail.setPadding(0, 20, 0, 0);
+
+        layout.addView(
+            title,
+            new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+        );
+        layout.addView(
+            message,
+            new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+        );
+        layout.addView(
+            detail,
+            new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+        );
+
+        setContentView(layout);
     }
 
     private void handleBackNavigation() {
@@ -67,11 +125,6 @@ public final class MainActivity extends Activity {
 
     @SuppressWarnings("deprecation")
     private void enterImmersiveMode() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            Api30Impl.enterImmersiveMode(this);
-            return;
-        }
-
         getWindow().getDecorView().setSystemUiVisibility(
             View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
                 | View.SYSTEM_UI_FLAG_FULLSCREEN
@@ -109,14 +162,6 @@ public final class MainActivity extends Activity {
 
     @Override
     protected void onDestroy() {
-        if (
-            Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-            backInvokedCallback != null
-        ) {
-            Api33Impl.unregisterBackCallback(this, backInvokedCallback);
-            backInvokedCallback = null;
-        }
-
         if (webView != null) {
             webView.destroy();
             webView = null;
@@ -127,49 +172,7 @@ public final class MainActivity extends Activity {
     @Override
     @SuppressWarnings("deprecation")
     public void onBackPressed() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
-            handleBackNavigation();
-        }
-    }
-
-    private static final class Api30Impl {
-        private Api30Impl() {}
-
-        static void enterImmersiveMode(Activity activity) {
-            activity.getWindow().setDecorFitsSystemWindows(false);
-            android.view.WindowInsetsController controller =
-                activity.getWindow().getInsetsController();
-
-            if (controller != null) {
-                controller.hide(
-                    android.view.WindowInsets.Type.statusBars() |
-                    android.view.WindowInsets.Type.navigationBars()
-                );
-                controller.setSystemBarsBehavior(
-                    android.view.WindowInsetsController
-                        .BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-                );
-            }
-        }
-    }
-
-    private static final class Api33Impl {
-        private Api33Impl() {}
-
-        static Object registerBackCallback(Activity activity, Runnable action) {
-            android.window.OnBackInvokedCallback callback = action::run;
-            activity.getOnBackInvokedDispatcher().registerOnBackInvokedCallback(
-                android.window.OnBackInvokedDispatcher.PRIORITY_DEFAULT,
-                callback
-            );
-            return callback;
-        }
-
-        static void unregisterBackCallback(Activity activity, Object callback) {
-            activity.getOnBackInvokedDispatcher().unregisterOnBackInvokedCallback(
-                (android.window.OnBackInvokedCallback) callback
-            );
-        }
+        handleBackNavigation();
     }
 
     private final class LocalAssetClient extends WebViewClient {
