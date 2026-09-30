@@ -5,15 +5,11 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.view.View;
-import android.view.WindowInsets;
-import android.view.WindowInsetsController;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebResourceResponse;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
-import android.window.OnBackInvokedCallback;
-import android.window.OnBackInvokedDispatcher;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -26,7 +22,7 @@ public final class MainActivity extends Activity {
     private static final String APP_HOST = "appassets.androidplatform.net";
 
     private WebView webView;
-    private OnBackInvokedCallback backInvokedCallback;
+    private Object backInvokedCallback;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -54,10 +50,9 @@ public final class MainActivity extends Activity {
             return;
         }
 
-        backInvokedCallback = this::handleBackNavigation;
-        getOnBackInvokedDispatcher().registerOnBackInvokedCallback(
-            OnBackInvokedDispatcher.PRIORITY_DEFAULT,
-            backInvokedCallback
+        backInvokedCallback = Api33Impl.registerBackCallback(
+            this,
+            this::handleBackNavigation
         );
     }
 
@@ -73,18 +68,7 @@ public final class MainActivity extends Activity {
     @SuppressWarnings("deprecation")
     private void enterImmersiveMode() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            getWindow().setDecorFitsSystemWindows(false);
-            WindowInsetsController controller = getWindow().getInsetsController();
-
-            if (controller != null) {
-                controller.hide(
-                    WindowInsets.Type.statusBars() |
-                    WindowInsets.Type.navigationBars()
-                );
-                controller.setSystemBarsBehavior(
-                    WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-                );
-            }
+            Api30Impl.enterImmersiveMode(this);
             return;
         }
 
@@ -129,9 +113,7 @@ public final class MainActivity extends Activity {
             Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
             backInvokedCallback != null
         ) {
-            getOnBackInvokedDispatcher().unregisterOnBackInvokedCallback(
-                backInvokedCallback
-            );
+            Api33Impl.unregisterBackCallback(this, backInvokedCallback);
             backInvokedCallback = null;
         }
 
@@ -147,6 +129,46 @@ public final class MainActivity extends Activity {
     public void onBackPressed() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
             handleBackNavigation();
+        }
+    }
+
+    private static final class Api30Impl {
+        private Api30Impl() {}
+
+        static void enterImmersiveMode(Activity activity) {
+            activity.getWindow().setDecorFitsSystemWindows(false);
+            android.view.WindowInsetsController controller =
+                activity.getWindow().getInsetsController();
+
+            if (controller != null) {
+                controller.hide(
+                    android.view.WindowInsets.Type.statusBars() |
+                    android.view.WindowInsets.Type.navigationBars()
+                );
+                controller.setSystemBarsBehavior(
+                    android.view.WindowInsetsController
+                        .BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                );
+            }
+        }
+    }
+
+    private static final class Api33Impl {
+        private Api33Impl() {}
+
+        static Object registerBackCallback(Activity activity, Runnable action) {
+            android.window.OnBackInvokedCallback callback = action::run;
+            activity.getOnBackInvokedDispatcher().registerOnBackInvokedCallback(
+                android.window.OnBackInvokedDispatcher.PRIORITY_DEFAULT,
+                callback
+            );
+            return callback;
+        }
+
+        static void unregisterBackCallback(Activity activity, Object callback) {
+            activity.getOnBackInvokedDispatcher().unregisterOnBackInvokedCallback(
+                (android.window.OnBackInvokedCallback) callback
+            );
         }
     }
 

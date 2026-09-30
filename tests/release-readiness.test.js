@@ -44,3 +44,21 @@ test("Android release keeps gameplay local and supports modern system navigation
   assert.match(activity, /setAllowFileAccess\(false\)/);
   assert.match(activity, /setAllowContentAccess\(false\)/);
 });
+
+test("Android launch class does not expose newer platform-only types to old devices", async () => {
+  const activity = await readFile(
+    new URL(
+      "../android/app/src/main/java/com/freestylegamedesign/spearrelay/MainActivity.java",
+      import.meta.url
+    ),
+    "utf8"
+  );
+
+  assert.doesNotMatch(activity, /import android\.window\./);
+  assert.doesNotMatch(activity, /import android\.view\.WindowInsets/);
+  assert.match(activity, /private Object backInvokedCallback;/);
+  assert.match(activity, /private static final class Api30Impl/);
+  assert.match(activity, /private static final class Api33Impl/);
+  assert.match(activity, /Build\.VERSION\.SDK_INT < Build\.VERSION_CODES\.TIRAMISU/);
+  assert.match(activity, /Build\.VERSION\.SDK_INT >= Build\.VERSION_CODES\.R/);
+});
