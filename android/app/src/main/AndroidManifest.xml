@@ -3,7 +3,6 @@
     <application
         android:allowBackup="false"
         android:appCategory="game"
-        android:enableOnBackInvokedCallback="true"
         android:hardwareAccelerated="true"
         android:icon="@drawable/app_icon"
         android:roundIcon="@drawable/app_icon"
